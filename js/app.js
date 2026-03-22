@@ -494,6 +494,9 @@ function renderMembers() {
 
 // ==================== FAMILY TREE EDITOR ====================
 
+// Structured data per node stored in _ed (editor data)
+// _ed: { firstName, spouseName, lastName, birthDate, spouseBirthDate, weddingDate }
+
 function loadTreeData() {
     var saved = localStorage.getItem('familyTree');
     if (saved) {
@@ -532,48 +535,147 @@ function renderTreeEditor() {
     });
 }
 
+function ensureEditorData(node) {
+    if (node._ed) return;
+    // Parse existing name/info into structured fields
+    node._ed = { firstName: '', spouseName: '', lastName: '', birthDate: '', spouseBirthDate: '', weddingDate: '' };
+    if (node.name) {
+        // Try to parse "firstName ו-spouseName lastName" or "firstName lastName"
+        var m = node.name.match(/^(.+?)\s+ו(.+?)\s+(\S+)$/);
+        if (m) {
+            node._ed.firstName = m[1].trim();
+            node._ed.spouseName = m[2].trim();
+            node._ed.lastName = m[3].trim();
+        } else {
+            var parts = node.name.split(/\s+/);
+            if (parts.length >= 2) {
+                node._ed.lastName = parts.pop();
+                node._ed.firstName = parts.join(' ');
+            } else {
+                node._ed.firstName = node.name;
+            }
+        }
+    }
+    if (node.info) {
+        // Parse "name DD.MM.YYYY | name DD.MM.YYYY | נישואים DD.MM.YYYY"
+        var segments = node.info.split('|').map(function(s) { return s.trim(); });
+        segments.forEach(function(seg) {
+            var dateMatch = seg.match(/(\d{2}\.\d{2}\.\d{4})/);
+            if (!dateMatch) {
+                var shortMatch = seg.match(/(\d{2}\.\d{2})$/);
+                if (shortMatch) dateMatch = [shortMatch[0], shortMatch[1]];
+            }
+            if (seg.indexOf('נישואים') !== -1 || seg.indexOf('נישואין') !== -1) {
+                if (dateMatch) node._ed.weddingDate = dateMatch[1];
+            } else if (dateMatch) {
+                if (!node._ed.birthDate) node._ed.birthDate = dateMatch[1];
+                else if (!node._ed.spouseBirthDate) node._ed.spouseBirthDate = dateMatch[1];
+            }
+        });
+    }
+}
+
+function buildDisplayName(ed) {
+    var name = ed.firstName || '';
+    if (ed.spouseName) name += ' ו' + ed.spouseName;
+    if (ed.lastName) name += ' ' + ed.lastName;
+    return name.trim();
+}
+
+function buildDisplayInfo(ed) {
+    var parts = [];
+    if (ed.firstName && ed.birthDate) parts.push(ed.firstName + ' ' + ed.birthDate);
+    if (ed.spouseName && ed.spouseBirthDate) parts.push(ed.spouseName + ' ' + ed.spouseBirthDate);
+    if (ed.weddingDate) parts.push('נישואים ' + ed.weddingDate);
+    return parts.join(' | ');
+}
+
+function esc(str) {
+    return (str || '').replace(/"/g, '&quot;').replace(/</g, '&lt;');
+}
+
 function buildNodeEditor(node, idx, parentPath, level) {
+    ensureEditorData(node);
+    var ed = node._ed;
     var path = parentPath.concat([idx]);
     var pathStr = path.join('-');
-    var levelLabel = level === 'child' ? 'ילד/ה' : level === 'gc' ? 'נכד/ה' : 'נין/ה';
+
+    var levelLabels = { child: 'ילד/ה', gc: 'נכד/ה', ggc: 'נין/ה' };
+    var levelColors = { child: '#c9a96e', gc: '#7ea', ggc: '#9bc' };
+    var levelLabel = levelLabels[level] || 'איבר';
     var indentClass = level === 'child' ? '' : level === 'gc' ? 'tree-indent-1' : 'tree-indent-2';
 
     var div = document.createElement('div');
     div.className = 'tree-node-editor ' + indentClass;
     div.dataset.path = pathStr;
 
+    // Collapse state
+    var isCollapsed = node._collapsed || false;
+    var collapseIcon = isCollapsed ? '▸' : '▾';
+    var previewText = buildDisplayName(ed) || '(ללא שם)';
+
     var html = '<div class="tree-node-header">';
-    html += '<span class="tree-node-label">' + levelLabel + '</span>';
+    html += '<button type="button" class="tree-collapse-btn" onclick="toggleNodeCollapse(\'' + pathStr + '\')" title="הצג/הסתר">' + collapseIcon + '</button>';
+    html += '<span class="tree-node-label" style="border-color:' + levelColors[level] + '">' + levelLabel + '</span>';
+    html += '<span class="tree-node-preview">' + esc(previewText) + '</span>';
     html += '<button type="button" class="tree-remove-btn" onclick="removeTreeNode(\'' + pathStr + '\')" title="הסר">✕</button>';
     html += '</div>';
-    html += '<div class="tree-node-fields">';
-    html += '<div class="form-group"><label>שם (כולל בן/בת זוג):</label><input type="text" class="tree-name" data-path="' + pathStr + '" value="' + (node.name || '') + '" placeholder="למשל: אלי ושרית לוי"></div>';
-    html += '<div class="form-group"><label>פרטים:</label><input type="text" class="tree-info" data-path="' + pathStr + '" value="' + (node.info || '') + '" placeholder="תאריכי לידה | נישואים"></div>';
-    html += '</div>';
 
-    // Sub-children
-    var nextLevel = level === 'child' ? 'gc' : level === 'gc' ? 'ggc' : null;
-    if (nextLevel) {
-        html += '<div class="tree-children" id="tree-children-' + pathStr + '">';
-        if (node.children && node.children.length > 0) {
-            // Will be filled by appending
-        }
+    if (!isCollapsed) {
+        html += '<div class="tree-node-body">';
+
+        // Row 1: Names
+        html += '<div class="tree-fields-row">';
+        html += '<div class="tree-field"><label>שם פרטי</label><input type="text" data-path="' + pathStr + '" data-field="firstName" value="' + esc(ed.firstName) + '" placeholder="שם פרטי"></div>';
+        html += '<div class="tree-field"><label>בן/בת זוג</label><input type="text" data-path="' + pathStr + '" data-field="spouseName" value="' + esc(ed.spouseName) + '" placeholder="שם בן/בת זוג"></div>';
+        html += '<div class="tree-field"><label>שם משפחה</label><input type="text" data-path="' + pathStr + '" data-field="lastName" value="' + esc(ed.lastName) + '" placeholder="משפחה"></div>';
         html += '</div>';
-        var addLabel = nextLevel === 'gc' ? '+ נכד/ה' : '+ נין/ה';
-        html += '<button type="button" class="tree-add-sub-btn quick-btn" onclick="addTreeNode(\'' + pathStr + '\')">' + addLabel + '</button>';
+
+        // Row 2: Dates
+        html += '<div class="tree-fields-row">';
+        html += '<div class="tree-field"><label>ת. לידה</label><input type="text" data-path="' + pathStr + '" data-field="birthDate" value="' + esc(ed.birthDate) + '" placeholder="DD.MM.YYYY" dir="ltr"></div>';
+        html += '<div class="tree-field"><label>ת. לידה בן/בת זוג</label><input type="text" data-path="' + pathStr + '" data-field="spouseBirthDate" value="' + esc(ed.spouseBirthDate) + '" placeholder="DD.MM.YYYY" dir="ltr"></div>';
+        html += '<div class="tree-field"><label>ת. נישואים</label><input type="text" data-path="' + pathStr + '" data-field="weddingDate" value="' + esc(ed.weddingDate) + '" placeholder="DD.MM.YYYY" dir="ltr"></div>';
+        html += '</div>';
+
+        // Sub-children
+        var nextLevel = level === 'child' ? 'gc' : level === 'gc' ? 'ggc' : null;
+        if (nextLevel) {
+            html += '<div class="tree-children" id="tree-children-' + pathStr + '"></div>';
+            var addLabel = nextLevel === 'gc' ? '+ נכד/ה' : '+ נין/ה';
+            html += '<button type="button" class="tree-add-sub-btn quick-btn" onclick="addTreeNode(\'' + pathStr + '\')">' + addLabel + '</button>';
+        }
+
+        html += '</div>'; // tree-node-body
+    } else {
+        // Collapsed - still render children container for data integrity
+        var nextLevel = level === 'child' ? 'gc' : level === 'gc' ? 'ggc' : null;
+        if (nextLevel) {
+            html += '<div class="tree-children" id="tree-children-' + pathStr + '" style="display:none"></div>';
+        }
     }
 
     div.innerHTML = html;
 
-    // Append sub-children after innerHTML is set
-    if (nextLevel && node.children && node.children.length > 0) {
+    // Append sub-children
+    var nextLevel2 = level === 'child' ? 'gc' : level === 'gc' ? 'ggc' : null;
+    if (nextLevel2 && node.children && node.children.length > 0) {
         var childrenContainer = div.querySelector('#tree-children-' + pathStr);
-        node.children.forEach(function(subChild, subIdx) {
-            childrenContainer.appendChild(buildNodeEditor(subChild, subIdx, path, nextLevel));
-        });
+        if (childrenContainer) {
+            node.children.forEach(function(subChild, subIdx) {
+                childrenContainer.appendChild(buildNodeEditor(subChild, subIdx, path, nextLevel2));
+            });
+        }
     }
 
     return div;
+}
+
+function toggleNodeCollapse(pathStr) {
+    syncEditorToData();
+    var node = getNodeByPath(pathStr);
+    if (node) node._collapsed = !node._collapsed;
+    renderTreeEditor();
 }
 
 function getNodeByPath(pathStr) {
@@ -591,39 +693,40 @@ function getNodeByPath(pathStr) {
     return node;
 }
 
-function getParentChildren(pathStr) {
-    if (!pathStr) return SITE_CONFIG.familyTree.children;
-    var parts = pathStr.split('-').map(Number);
-    var current = SITE_CONFIG.familyTree.children;
-    for (var i = 0; i < parts.length; i++) {
-        if (!current[parts[i]]) return current;
-        if (!current[parts[i]].children) current[parts[i]].children = [];
-        current = current[parts[i]].children;
-    }
-    return current;
-}
-
 function addTreeNode(parentPathStr) {
-    // First save current editor values
     syncEditorToData();
 
+    var newNode = {
+        name: '', info: '', children: [],
+        _ed: { firstName: '', spouseName: '', lastName: '', birthDate: '', spouseBirthDate: '', weddingDate: '' }
+    };
+
     if (!parentPathStr) {
-        // Adding a top-level child
         if (!SITE_CONFIG.familyTree.children) SITE_CONFIG.familyTree.children = [];
-        SITE_CONFIG.familyTree.children.push({ name: '', info: '', level: 'child', children: [] });
+        newNode.level = 'child';
+        SITE_CONFIG.familyTree.children.push(newNode);
     } else {
         var parentNode = getNodeByPath(parentPathStr);
         if (!parentNode) return;
         if (!parentNode.children) parentNode.children = [];
-        var parts = parentPathStr.split('-');
-        var nextLevel = parts.length === 1 ? 'gc' : 'ggc';
-        parentNode.children.push({ name: '', info: '', level: nextLevel, children: [] });
+        var depth = parentPathStr.split('-').length;
+        newNode.level = depth === 1 ? 'gc' : 'ggc';
+        parentNode.children.push(newNode);
+        // Auto-expand parent
+        parentNode._collapsed = false;
     }
 
     renderTreeEditor();
+
+    // Focus the new node's first input
+    setTimeout(function() {
+        var inputs = document.querySelectorAll('.tree-node-editor:last-child input[data-field="firstName"]');
+        if (inputs.length > 0) inputs[inputs.length - 1].focus();
+    }, 50);
 }
 
 function removeTreeNode(pathStr) {
+    if (!confirm('להסיר איבר זה וכל הילדים שלו?')) return;
     syncEditorToData();
     var parts = pathStr.split('-').map(Number);
     var idx = parts.pop();
@@ -645,30 +748,53 @@ function removeTreeNode(pathStr) {
 }
 
 function syncEditorToData() {
-    // Read all inputs and update the tree data
-    var nameInputs = document.querySelectorAll('.tree-name');
-    nameInputs.forEach(function(input) {
+    var inputs = document.querySelectorAll('.tree-node-body input[data-path]');
+    inputs.forEach(function(input) {
         var node = getNodeByPath(input.dataset.path);
-        if (node) node.name = input.value.trim();
+        if (!node) return;
+        ensureEditorData(node);
+        node._ed[input.dataset.field] = input.value.trim();
     });
-    var infoInputs = document.querySelectorAll('.tree-info');
-    infoInputs.forEach(function(input) {
-        var node = getNodeByPath(input.dataset.path);
-        if (node) node.info = input.value.trim();
-    });
+
+    // Rebuild name/info from _ed
+    function rebuildNode(n) {
+        if (n._ed) {
+            n.name = buildDisplayName(n._ed);
+            n.info = buildDisplayInfo(n._ed);
+        }
+        if (n.children) n.children.forEach(rebuildNode);
+    }
+    (SITE_CONFIG.familyTree.children || []).forEach(rebuildNode);
 }
 
 function saveTreeFromEditor() {
     syncEditorToData();
 
-    // Clean empty nodes
+    // Clean empty nodes (no firstName at all)
     function cleanTree(children) {
         return children.filter(function(c) {
             if (c.children) c.children = cleanTree(c.children);
-            return c.name && c.name.trim() !== '';
+            return c._ed && c._ed.firstName && c._ed.firstName.trim() !== '';
         });
     }
     SITE_CONFIG.familyTree.children = cleanTree(SITE_CONFIG.familyTree.children || []);
+
+    // Strip _collapsed and _ed before saving (rebuild on load)
+    function stripMeta(arr) {
+        return arr.map(function(n) {
+            var clean = { name: n.name, info: n.info, level: n.level, _ed: n._ed };
+            if (n.children && n.children.length > 0) clean.children = stripMeta(n.children);
+            else clean.children = [];
+            return clean;
+        });
+    }
+    var toSave = stripMeta(SITE_CONFIG.familyTree.children);
+    localStorage.setItem('familyTree', JSON.stringify(toSave));
+
+    // Update display
+    FAMILY_DATA = SITE_CONFIG.familyTree;
+    renderFamilyTree();
+    renderTreeEditor();
 
     localStorage.setItem('familyTree', JSON.stringify(SITE_CONFIG.familyTree.children));
 
