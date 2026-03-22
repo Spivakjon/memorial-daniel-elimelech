@@ -497,6 +497,35 @@ function renderMembers() {
 // Structured data per node stored in _ed (editor data)
 // _ed: { firstName, spouseName, lastName, birthDate, spouseBirthDate, weddingDate }
 
+// Auto-format date inputs: typing "03071991" becomes "03.07.1991"
+function initDateAutoFormat(input) {
+    input.addEventListener('input', function(e) {
+        var raw = this.value.replace(/\D/g, ''); // digits only
+        var formatted = '';
+        if (raw.length <= 2) {
+            formatted = raw;
+        } else if (raw.length <= 4) {
+            formatted = raw.slice(0, 2) + '.' + raw.slice(2);
+        } else {
+            formatted = raw.slice(0, 2) + '.' + raw.slice(2, 4) + '.' + raw.slice(4, 8);
+        }
+        this.value = formatted;
+    });
+
+    // Also handle paste
+    input.addEventListener('paste', function(e) {
+        var self = this;
+        setTimeout(function() {
+            var raw = self.value.replace(/\D/g, '');
+            var formatted = '';
+            if (raw.length <= 2) formatted = raw;
+            else if (raw.length <= 4) formatted = raw.slice(0, 2) + '.' + raw.slice(2);
+            else formatted = raw.slice(0, 2) + '.' + raw.slice(2, 4) + '.' + raw.slice(4, 8);
+            self.value = formatted;
+        }, 0);
+    });
+}
+
 function loadTreeData() {
     var saved = localStorage.getItem('familyTree');
     if (saved) {
@@ -533,6 +562,9 @@ function renderTreeEditor() {
     children.forEach(function(child, idx) {
         container.appendChild(buildNodeEditor(child, idx, [], 'child'));
     });
+
+    // Attach auto-format to all date inputs
+    container.querySelectorAll('input[data-field="birthDate"], input[data-field="spouseBirthDate"], input[data-field="weddingDate"]').forEach(initDateAutoFormat);
 }
 
 function ensureEditorData(node) {
@@ -633,9 +665,9 @@ function buildNodeEditor(node, idx, parentPath, level) {
 
         // Row 2: Dates
         html += '<div class="tree-fields-row">';
-        html += '<div class="tree-field"><label>ת. לידה</label><input type="text" data-path="' + pathStr + '" data-field="birthDate" value="' + esc(ed.birthDate) + '" placeholder="DD.MM.YYYY" dir="ltr"></div>';
-        html += '<div class="tree-field"><label>ת. לידה בן/בת זוג</label><input type="text" data-path="' + pathStr + '" data-field="spouseBirthDate" value="' + esc(ed.spouseBirthDate) + '" placeholder="DD.MM.YYYY" dir="ltr"></div>';
-        html += '<div class="tree-field"><label>ת. נישואים</label><input type="text" data-path="' + pathStr + '" data-field="weddingDate" value="' + esc(ed.weddingDate) + '" placeholder="DD.MM.YYYY" dir="ltr"></div>';
+        html += '<div class="tree-field"><label>ת. לידה</label><input type="text" data-path="' + pathStr + '" data-field="birthDate" value="' + esc(ed.birthDate) + '" placeholder="יום חודש שנה" dir="ltr" inputmode="numeric"></div>';
+        html += '<div class="tree-field"><label>ת. לידה בן/בת זוג</label><input type="text" data-path="' + pathStr + '" data-field="spouseBirthDate" value="' + esc(ed.spouseBirthDate) + '" placeholder="יום חודש שנה" dir="ltr" inputmode="numeric"></div>';
+        html += '<div class="tree-field"><label>ת. נישואים</label><input type="text" data-path="' + pathStr + '" data-field="weddingDate" value="' + esc(ed.weddingDate) + '" placeholder="יום חודש שנה" dir="ltr" inputmode="numeric"></div>';
         html += '</div>';
 
         // Sub-children
