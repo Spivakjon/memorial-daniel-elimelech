@@ -1,4 +1,4 @@
-// family-tree.js - Family tree with JS-positioned lines (config-driven)
+// family-tree.js - Family tree with pure CSS lines (config-driven)
 
 var FAMILY_DATA = SITE_CONFIG.familyTree;
 
@@ -20,7 +20,6 @@ var FAMILY_DATA = SITE_CONFIG.familyTree;
                 SITE_CONFIG.familyTree.spouseName = r.spouseName;
                 SITE_CONFIG.familyTree.spouseLastName = r.spouseLastName || '';
                 SITE_CONFIG.familyTree.spouseBirthDate = r.spouseBirthDate || '';
-                // Rebuild root display name
                 var rootPerson = SITE_CONFIG.people[0];
                 var rootName = rootPerson.name + ' ז"ל';
                 rootName += ' ו' + r.spouseName;
@@ -28,7 +27,6 @@ var FAMILY_DATA = SITE_CONFIG.familyTree;
                 rootName += ' ' + ln;
                 FAMILY_DATA.name = rootName;
                 SITE_CONFIG.familyTree.name = rootName;
-                // Root info
                 var infoParts = [];
                 if (r.spouseBirthDate) infoParts.push(r.spouseName + ' ' + r.spouseBirthDate);
                 if (infoParts.length) FAMILY_DATA.info = infoParts.join(' | ');
@@ -71,22 +69,18 @@ function renderFamilyTree() {
     var container = document.getElementById('family-tree-container');
     if (!container) return;
 
-    // Hide section if no children in tree
     if (!FAMILY_DATA.children || FAMILY_DATA.children.length === 0) {
         var section = document.getElementById('family-tree-section');
         if (section) section.style.display = 'none';
         return;
     }
 
-    // Show section
     var section = document.getElementById('family-tree-section');
     if (section) section.style.display = 'block';
 
-    container.innerHTML = '<div class="ft" id="ft-root">' + renderNode(FAMILY_DATA) + '</div>';
+    container.innerHTML = '<div class="ft">' + renderNode(FAMILY_DATA) + '</div>';
 
-    setTimeout(positionHLines, 50);
-    window.addEventListener('resize', positionHLines);
-
+    // Tooltips
     container.querySelectorAll('.ft-node[data-info]').forEach(function(el) {
         el.addEventListener('click', function(e) {
             e.stopPropagation();
@@ -101,58 +95,33 @@ function renderNode(node) {
     var hasKids = node.children && node.children.length > 0;
     var cls = 'ft-node ft-' + node.level;
     var infoAttr = node.info ? ' data-info="' + escHtml(node.info) + '"' : '';
-    var name = node.spouse ? node.name + ' ו' + node.spouse : node.name;
+    var name = node.name || '';
 
     var h = '<div class="ft-item">';
     h += '<div class="' + cls + '"' + infoAttr + '>' + escHtml(name) + '</div>';
 
     if (hasKids) {
         h += '<div class="ft-vline"></div>';
-        h += '<div class="ft-kids">';
-        h += '<div class="ft-hline"></div>';
-        h += '<div class="ft-kids-row">';
-        node.children.forEach(function(kid) {
-            h += '<div class="ft-kid-col">';
-            h += '<div class="ft-vline-up"></div>';
+        var count = node.children.length;
+        h += '<div class="ft-kids' + (count === 1 ? ' ft-single' : '') + '">';
+        node.children.forEach(function(kid, i) {
+            var colCls = 'ft-kid-col';
+            if (count > 1) {
+                if (i === 0) colCls += ' ft-first';
+                else if (i === count - 1) colCls += ' ft-last';
+                else colCls += ' ft-mid';
+            }
+            h += '<div class="' + colCls + '">';
             h += renderNode(kid);
             h += '</div>';
         });
-        h += '</div></div>';
+        h += '</div>';
     }
     h += '</div>';
     return h;
 }
 
-function positionHLines() {
-    document.querySelectorAll('.ft-kids').forEach(function(kids) {
-        var hline = kids.querySelector(':scope > .ft-hline');
-        var row = kids.querySelector(':scope > .ft-kids-row');
-        if (!hline || !row) return;
-
-        var cols = row.querySelectorAll(':scope > .ft-kid-col');
-        if (cols.length < 2) { hline.style.display = 'none'; return; }
-
-        var first = cols[0];
-        var last = cols[cols.length - 1];
-        var rowRect = row.getBoundingClientRect();
-        var firstRect = first.getBoundingClientRect();
-        var lastRect = last.getBoundingClientRect();
-
-        var leftPos = firstRect.left + firstRect.width / 2 - rowRect.left;
-        var rightPos = lastRect.left + lastRect.width / 2 - rowRect.left;
-
-        var l = Math.min(leftPos, rightPos);
-        var r = Math.max(leftPos, rightPos);
-
-        hline.style.display = 'block';
-        hline.style.position = 'absolute';
-        hline.style.top = '0';
-        hline.style.left = l + 'px';
-        hline.style.width = (r - l) + 'px';
-        hline.style.height = '2px';
-    });
-}
-
+// Tooltips
 function showTreeTooltip(el) {
     hideAllTooltips();
     var info = el.dataset.info;
