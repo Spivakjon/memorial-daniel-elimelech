@@ -551,14 +551,54 @@ function initTreeEditor() {
 function renderTreeEditor() {
     var container = document.getElementById('tree-editor');
     if (!container) return;
+    container.innerHTML = '';
 
+    // Load saved root spouse data
+    var savedRoot = localStorage.getItem('familyTreeRoot');
+    if (savedRoot) {
+        try {
+            var r = JSON.parse(savedRoot);
+            if (r.spouseName) SITE_CONFIG.familyTree.spouseName = r.spouseName;
+            if (r.spouseLastName) SITE_CONFIG.familyTree.spouseLastName = r.spouseLastName;
+            if (r.spouseBirthDate) SITE_CONFIG.familyTree.spouseBirthDate = r.spouseBirthDate;
+            if (r.spouseAlive !== undefined) SITE_CONFIG.familyTree.spouseAlive = r.spouseAlive;
+        } catch(e) {}
+    }
+
+    // Root spouse editor
+    var root = SITE_CONFIG.familyTree;
+    var rootDiv = document.createElement('div');
+    rootDiv.className = 'tree-node-editor tree-root-editor';
+    var spAlive = root.spouseAlive !== false;
+    rootDiv.innerHTML =
+        '<div class="tree-node-header">' +
+            '<span class="tree-node-label tree-root-label">שורש העץ</span>' +
+            '<span class="tree-node-preview">' + esc(root.name) + '</span>' +
+        '</div>' +
+        '<div class="tree-node-body">' +
+            '<p class="info-text" style="margin-bottom:0.5rem">בן/בת זוג (בחיים)</p>' +
+            '<div class="tree-fields-row">' +
+                '<div class="tree-field"><label>שם פרטי</label><input type="text" id="root-spouse-name" value="' + esc(root.spouseName || '') + '" placeholder="למשל: זהבה"></div>' +
+                '<div class="tree-field"><label>שם משפחה (אם שונה)</label><input type="text" id="root-spouse-last" value="' + esc(root.spouseLastName || '') + '" placeholder="אם שונה מהנפטר"></div>' +
+                '<div class="tree-field"><label>ת. לידה</label><input type="text" id="root-spouse-birth" value="' + esc(root.spouseBirthDate || '') + '" placeholder="יום חודש שנה" dir="ltr" inputmode="numeric"></div>' +
+            '</div>' +
+        '</div>';
+    container.appendChild(rootDiv);
+
+    // Attach date format to root spouse birth
+    var rootBirthInput = document.getElementById('root-spouse-birth');
+    if (rootBirthInput) initDateAutoFormat(rootBirthInput);
+
+    // Children
     var children = SITE_CONFIG.familyTree.children || [];
     if (children.length === 0) {
-        container.innerHTML = '<p class="info-text">אין ילדים בעץ. לחצו "+ הוסף ילד/ה" להתחיל.</p>';
+        var emptyMsg = document.createElement('p');
+        emptyMsg.className = 'info-text';
+        emptyMsg.textContent = 'אין ילדים בעץ. לחצו "+ הוסף ילד/ה" להתחיל.';
+        container.appendChild(emptyMsg);
         return;
     }
 
-    container.innerHTML = '';
     children.forEach(function(child, idx) {
         container.appendChild(buildNodeEditor(child, idx, [], 'child'));
     });
@@ -802,7 +842,41 @@ function syncEditorToData() {
 function saveTreeFromEditor() {
     syncEditorToData();
 
-    // Clean empty nodes (no firstName at all)
+    // Save root spouse data
+    var spouseName = (document.getElementById('root-spouse-name') || {}).value || '';
+    var spouseLastName = (document.getElementById('root-spouse-last') || {}).value || '';
+    var spouseBirthDate = (document.getElementById('root-spouse-birth') || {}).value || '';
+    SITE_CONFIG.familyTree.spouseName = spouseName.trim();
+    SITE_CONFIG.familyTree.spouseLastName = spouseLastName.trim();
+    SITE_CONFIG.familyTree.spouseBirthDate = spouseBirthDate.trim();
+    SITE_CONFIG.familyTree.spouseAlive = true;
+
+    // Rebuild root display name
+    var rootPerson = SITE_CONFIG.people[0];
+    var rootName = rootPerson.name + ' ז"ל';
+    if (SITE_CONFIG.familyTree.spouseName) {
+        rootName += ' ו' + SITE_CONFIG.familyTree.spouseName;
+        var lastName = SITE_CONFIG.familyTree.spouseLastName || rootPerson.name.split(' ').pop();
+        rootName += ' ' + lastName;
+    }
+    SITE_CONFIG.familyTree.name = rootName;
+
+    // Build root info
+    var rootInfoParts = [];
+    if (rootPerson.birthYear) rootInfoParts.push(rootPerson.name.split(' ')[0] + ' ' + rootPerson.birthYear);
+    if (SITE_CONFIG.familyTree.spouseName && SITE_CONFIG.familyTree.spouseBirthDate) {
+        rootInfoParts.push(SITE_CONFIG.familyTree.spouseName + ' ' + SITE_CONFIG.familyTree.spouseBirthDate);
+    }
+    SITE_CONFIG.familyTree.info = rootInfoParts.join(' | ');
+
+    localStorage.setItem('familyTreeRoot', JSON.stringify({
+        spouseName: SITE_CONFIG.familyTree.spouseName,
+        spouseLastName: SITE_CONFIG.familyTree.spouseLastName,
+        spouseBirthDate: SITE_CONFIG.familyTree.spouseBirthDate,
+        spouseAlive: SITE_CONFIG.familyTree.spouseAlive
+    }));
+
+    // Clean empty child nodes
     function cleanTree(children) {
         return children.filter(function(c) {
             if (c.children) c.children = cleanTree(c.children);
@@ -811,7 +885,7 @@ function saveTreeFromEditor() {
     }
     SITE_CONFIG.familyTree.children = cleanTree(SITE_CONFIG.familyTree.children || []);
 
-    // Strip _collapsed and _ed before saving (rebuild on load)
+    // Save children
     function stripMeta(arr) {
         return arr.map(function(n) {
             var clean = { name: n.name, info: n.info, level: n.level, _ed: n._ed };
@@ -820,17 +894,9 @@ function saveTreeFromEditor() {
             return clean;
         });
     }
-    var toSave = stripMeta(SITE_CONFIG.familyTree.children);
-    localStorage.setItem('familyTree', JSON.stringify(toSave));
+    localStorage.setItem('familyTree', JSON.stringify(stripMeta(SITE_CONFIG.familyTree.children)));
 
     // Update display
-    FAMILY_DATA = SITE_CONFIG.familyTree;
-    renderFamilyTree();
-    renderTreeEditor();
-
-    localStorage.setItem('familyTree', JSON.stringify(SITE_CONFIG.familyTree.children));
-
-    // Update FAMILY_DATA and re-render tree
     FAMILY_DATA = SITE_CONFIG.familyTree;
     renderFamilyTree();
     renderTreeEditor();

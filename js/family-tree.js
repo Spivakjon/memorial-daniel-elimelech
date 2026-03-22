@@ -11,6 +11,30 @@ var FAMILY_DATA = SITE_CONFIG.familyTree;
             SITE_CONFIG.familyTree.children = FAMILY_DATA.children;
         } catch(e) {}
     }
+    // Load saved root spouse data
+    var savedRoot = localStorage.getItem('familyTreeRoot');
+    if (savedRoot) {
+        try {
+            var r = JSON.parse(savedRoot);
+            if (r.spouseName) {
+                SITE_CONFIG.familyTree.spouseName = r.spouseName;
+                SITE_CONFIG.familyTree.spouseLastName = r.spouseLastName || '';
+                SITE_CONFIG.familyTree.spouseBirthDate = r.spouseBirthDate || '';
+                // Rebuild root display name
+                var rootPerson = SITE_CONFIG.people[0];
+                var rootName = rootPerson.name + ' ז"ל';
+                rootName += ' ו' + r.spouseName;
+                var ln = r.spouseLastName || rootPerson.name.split(' ').pop();
+                rootName += ' ' + ln;
+                FAMILY_DATA.name = rootName;
+                SITE_CONFIG.familyTree.name = rootName;
+                // Root info
+                var infoParts = [];
+                if (r.spouseBirthDate) infoParts.push(r.spouseName + ' ' + r.spouseBirthDate);
+                if (infoParts.length) FAMILY_DATA.info = infoParts.join(' | ');
+            }
+        } catch(e) {}
+    }
 })();
 
 function calcAgeFromDate(dateStr) {

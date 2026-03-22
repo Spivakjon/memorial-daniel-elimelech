@@ -50,7 +50,11 @@ var SITE_CONFIG = {
     // ===== עץ משפחה =====
     familyTree: {
         name: 'דניאל אלימלך ז"ל',
-        info: '',                   // TODO: תאריך לידה וכו'
+        spouseName: '',             // שם בן/בת זוג בחיים (למשל: זהבה)
+        spouseLastName: '',         // שם משפחה בן/בת זוג (אם שונה)
+        spouseBirthDate: '',        // תאריך לידה בן/בת זוג
+        spouseAlive: true,          // בן/בת זוג בחיים?
+        info: '',
         level: 'root',
         children: [
             // TODO: הוסיפו ילדים בפורמט:

@@ -2422,6 +2422,16 @@ hr {
     padding: 0.2rem 0.65rem;
 }
 
+.tree-root-editor {
+    border-right-color: #8a6d3b;
+    background: linear-gradient(135deg, rgba(201,169,110,0.08), var(--bg));
+    margin-bottom: 1.25rem;
+}
+
+.tree-root-label {
+    background: linear-gradient(135deg, var(--accent), var(--accent-dark)) !important;
+}
+
 #add-child-btn {
     background: transparent;
     color: var(--accent-dark);
