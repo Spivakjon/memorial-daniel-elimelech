@@ -152,6 +152,8 @@ function savePersonDetails() {
     renderActionButtons();
     document.getElementById('page-title').textContent = SITE_CONFIG.siteTitle;
 
+    saveAllToCloud();
+
     var msg = document.getElementById('save-person-success');
     msg.classList.remove('hidden');
     setTimeout(function() { msg.classList.add('hidden'); }, 2000);
@@ -443,6 +445,7 @@ function saveAzkaraFromForm() {
     };
     localStorage.setItem('azkara', JSON.stringify(state.azkara));
     updateMemorialAzkara();
+    saveAllToCloud();
 
     var msg = document.getElementById('save-success');
     msg.classList.remove('hidden');
@@ -468,12 +471,14 @@ function addMember() {
     document.getElementById('member-email').value = '';
     document.getElementById('member-phone').value = '';
     renderMembers();
+    saveAllToCloud();
 }
 
 function removeMember(id) {
     state.members = state.members.filter(function(m) { return m.id !== id; });
     localStorage.setItem('members', JSON.stringify(state.members));
     renderMembers();
+    saveAllToCloud();
 }
 
 function renderMembers() {
@@ -901,6 +906,8 @@ function saveTreeFromEditor() {
     renderFamilyTree();
     renderTreeEditor();
 
+    saveAllToCloud();
+
     var msg = document.getElementById('save-tree-success');
     msg.classList.remove('hidden');
     setTimeout(function() { msg.classList.add('hidden'); }, 2000);
@@ -1117,34 +1124,159 @@ function saveSelectedLetters() {
     localStorage.setItem('selectedLetters', JSON.stringify(state.selectedLetters));
 }
 
+// ==================== CLOUD DB ====================
+
+// Collect all site data into one object
+function collectSiteData() {
+    return {
+        personOverrides: state.personOverrides,
+        azkara: state.azkara,
+        members: state.members,
+        selectedLetters: state.selectedLetters,
+        familyTree: SITE_CONFIG.familyTree.children,
+        familyTreeRoot: {
+            spouseName: SITE_CONFIG.familyTree.spouseName || '',
+            spouseLastName: SITE_CONFIG.familyTree.spouseLastName || '',
+            spouseBirthDate: SITE_CONFIG.familyTree.spouseBirthDate || '',
+            spouseAlive: SITE_CONFIG.familyTree.spouseAlive !== false
+        },
+        savedAt: new Date().toISOString()
+    };
+}
+
+// Apply loaded cloud data to site
+function applySiteData(data) {
+    if (!data || typeof data !== 'object') return;
+
+    if (data.personOverrides) {
+        state.personOverrides = data.personOverrides;
+        localStorage.setItem('personOverrides', JSON.stringify(data.personOverrides));
+    }
+    if (data.azkara) {
+        state.azkara = data.azkara;
+        localStorage.setItem('azkara', JSON.stringify(data.azkara));
+    }
+    if (data.members) {
+        state.members = data.members;
+        localStorage.setItem('members', JSON.stringify(data.members));
+    }
+    if (data.selectedLetters) {
+        state.selectedLetters = data.selectedLetters;
+        localStorage.setItem('selectedLetters', JSON.stringify(data.selectedLetters));
+    }
+    if (data.familyTree) {
+        SITE_CONFIG.familyTree.children = data.familyTree;
+        localStorage.setItem('familyTree', JSON.stringify(data.familyTree));
+    }
+    if (data.familyTreeRoot) {
+        SITE_CONFIG.familyTree.spouseName = data.familyTreeRoot.spouseName || '';
+        SITE_CONFIG.familyTree.spouseLastName = data.familyTreeRoot.spouseLastName || '';
+        SITE_CONFIG.familyTree.spouseBirthDate = data.familyTreeRoot.spouseBirthDate || '';
+        SITE_CONFIG.familyTree.spouseAlive = data.familyTreeRoot.spouseAlive !== false;
+        localStorage.setItem('familyTreeRoot', JSON.stringify(data.familyTreeRoot));
+    }
+}
+
+// Save all data to cloud
+function saveToCloud(callback) {
+    if (!SITE_CONFIG.appsScriptUrl) {
+        if (callback) callback(false, 'לא הוגדר Apps Script URL');
+        return;
+    }
+    var siteData = collectSiteData();
+    fetch(SITE_CONFIG.appsScriptUrl, {
+        method: 'POST',
+        body: JSON.stringify({
+            action: 'saveConfig',
+            pass: SITE_CONFIG.password,
+            config: siteData
+        })
+    })
+    .then(function(r) { return r.json(); })
+    .then(function(res) {
+        if (res.success) {
+            console.log('Cloud save OK');
+            if (callback) callback(true);
+        } else {
+            console.error('Cloud save failed:', res.error);
+            if (callback) callback(false, res.error);
+        }
+    })
+    .catch(function(err) {
+        console.error('Cloud save error:', err);
+        if (callback) callback(false, err.message);
+    });
+}
+
+// Load all data from cloud
+function loadFromCloud(callback) {
+    if (!SITE_CONFIG.appsScriptUrl) {
+        if (callback) callback(false);
+        return;
+    }
+    fetch(SITE_CONFIG.appsScriptUrl + '?action=loadConfig')
+        .then(function(r) { return r.json(); })
+        .then(function(res) {
+            if (res.success && res.config && Object.keys(res.config).length > 0) {
+                applySiteData(res.config);
+                console.log('Cloud load OK');
+                if (callback) callback(true);
+            } else {
+                if (callback) callback(false);
+            }
+        })
+        .catch(function(err) {
+            console.error('Cloud load error:', err);
+            if (callback) callback(false);
+        });
+}
+
+// Wrap every save action to also push to cloud
+function saveAllToCloud() {
+    // Also save to localStorage as fallback
+    localStorage.setItem('personOverrides', JSON.stringify(state.personOverrides));
+    localStorage.setItem('azkara', JSON.stringify(state.azkara));
+    localStorage.setItem('members', JSON.stringify(state.members));
+    localStorage.setItem('selectedLetters', JSON.stringify(state.selectedLetters));
+
+    saveToCloud();
+}
+
 // ==================== INIT ====================
 
-function initApp() {
-    // Apply saved overrides first
+function renderFullApp() {
     try { applyPersonOverrides(); } catch(e) { console.error('overrides:', e); }
 
-    // Set page title and footer
     document.getElementById('page-title').textContent = SITE_CONFIG.siteTitle;
     document.getElementById('footer-text').textContent = 'נבנה באהבה ע"י ' + SITE_CONFIG.builtBy;
 
-    try { initDarkMode(); } catch(e) { console.error('darkMode:', e); }
-    try { initManageLock(); } catch(e) { console.error('manageLock:', e); }
-    try { initNav(); } catch(e) { console.error('nav:', e); }
-
-    // Render dynamic content
     try { renderPersonCards(); } catch(e) { console.error('personCards:', e); }
     try { renderActionButtons(); } catch(e) { console.error('actionBtns:', e); }
     try { renderAdvancedChecklist(); } catch(e) { console.error('advChecklist:', e); }
     try { renderPersonDetailsEditor(); } catch(e) { console.error('personEditor:', e); }
-
     try { initLetters(); } catch(e) { console.error('letters:', e); }
     try { initAzkaraAdmin(); } catch(e) { console.error('azkaraAdmin:', e); }
     try { initMembers(); } catch(e) { console.error('members:', e); }
     try { updateElapsedTimes(); } catch(e) { console.error('elapsed:', e); }
     try { updateMemorialAzkara(); } catch(e) { console.error('memAzkara:', e); }
-
-    // Tree editor
     try { initTreeEditor(); } catch(e) { console.error('treeEditor:', e); }
+    try { renderFamilyTree(); } catch(e) { console.error('tree:', e); }
+}
+
+function initApp() {
+    try { initDarkMode(); } catch(e) { console.error('darkMode:', e); }
+    try { initManageLock(); } catch(e) { console.error('manageLock:', e); }
+    try { initNav(); } catch(e) { console.error('nav:', e); }
+
+    // Render with local data first (instant)
+    renderFullApp();
+
+    // Then try loading from cloud and re-render if newer data exists
+    loadFromCloud(function(success) {
+        if (success) {
+            renderFullApp();
+        }
+    });
 
     // Buttons
     try {
@@ -1153,16 +1285,10 @@ function initApp() {
         document.getElementById('save-person-btn').addEventListener('click', savePersonDetails);
     } catch(e) { console.error('buttons:', e); }
 
-    // Family tree
-    try { renderFamilyTree(); } catch(e) { console.error('tree:', e); }
-
     // Gallery
     try { initGallery(); } catch(e) { console.error('gallery:', e); }
-
-    // Duplicate scanner
     try { initDuplicateScanner(); } catch(e) { console.error('dupScanner:', e); }
 
-    // Upload handlers
     try {
         document.getElementById('file-input').addEventListener('change', handleFileSelect);
         document.getElementById('upload-submit-btn').addEventListener('click', submitUpload);

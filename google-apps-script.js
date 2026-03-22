@@ -8,6 +8,7 @@
 // 6. הדבק את ה-URL ב-config.js בשדה appsScriptUrl
 
 var FOLDER_NAME = 'הנצחה דניאל אלימלך - תמונות';
+var CONFIG_FILE_NAME = '_site_config.json';
 var PASSWORD = '3008';
 
 function getOrCreateFolder() {
@@ -16,10 +17,51 @@ function getOrCreateFolder() {
   return DriveApp.createFolder(FOLDER_NAME);
 }
 
+// ==================== CONFIG DB ====================
+
+function getConfigFile() {
+  var folder = getOrCreateFolder();
+  var files = folder.getFilesByName(CONFIG_FILE_NAME);
+  if (files.hasNext()) return files.next();
+  // Create empty config file
+  var file = folder.createFile(CONFIG_FILE_NAME, '{}', 'application/json');
+  return file;
+}
+
+function loadConfig() {
+  var file = getConfigFile();
+  try {
+    return JSON.parse(file.getBlob().getDataAsString());
+  } catch(e) {
+    return {};
+  }
+}
+
+function saveConfig(data) {
+  var file = getConfigFile();
+  file.setContent(JSON.stringify(data));
+}
+
+// ==================== doPost ====================
+
 function doPost(e) {
   try {
     var data = JSON.parse(e.postData.contents);
 
+    // ---- Save site config (tree, azkara, person details etc.) ----
+    if (data.action === 'saveConfig') {
+      if (data.pass !== PASSWORD) {
+        return ContentService.createTextOutput(JSON.stringify({
+          success: false, error: 'סיסמה שגויה'
+        })).setMimeType(ContentService.MimeType.JSON);
+      }
+      saveConfig(data.config);
+      return ContentService.createTextOutput(JSON.stringify({
+        success: true
+      })).setMimeType(ContentService.MimeType.JSON);
+    }
+
+    // ---- Update photo description ----
     if (data.action === 'updateDesc') {
       var file = DriveApp.getFileById(data.fileId);
       var meta = {};
@@ -31,6 +73,7 @@ function doPost(e) {
       })).setMimeType(ContentService.MimeType.JSON);
     }
 
+    // ---- Upload photo ----
     var folder = getOrCreateFolder();
     var fileData = Utilities.base64Decode(data.file);
     var blob = Utilities.newBlob(fileData, data.mimeType, data.fileName);
@@ -58,10 +101,22 @@ function doPost(e) {
   }
 }
 
+// ==================== doGet ====================
+
 function doGet(e) {
   try {
     var action = e.parameter.action;
 
+    // ---- Load site config ----
+    if (action === 'loadConfig') {
+      var config = loadConfig();
+      return ContentService.createTextOutput(JSON.stringify({
+        success: true,
+        config: config
+      })).setMimeType(ContentService.MimeType.JSON);
+    }
+
+    // ---- Update photo description ----
     if (action === 'updateDesc') {
       var fileId = e.parameter.fileId;
       var desc = e.parameter.desc || '';
@@ -75,6 +130,7 @@ function doGet(e) {
       })).setMimeType(ContentService.MimeType.JSON);
     }
 
+    // ---- Delete photo ----
     if (action === 'delete') {
       var pass = e.parameter.pass;
       if (pass !== PASSWORD) {
@@ -89,13 +145,14 @@ function doGet(e) {
       })).setMimeType(ContentService.MimeType.JSON);
     }
 
-    // Default: list files
+    // ---- Default: list photos ----
     var folder = getOrCreateFolder();
     var files = folder.getFiles();
     var result = [];
 
     while (files.hasNext()) {
       var file = files.next();
+      if (file.getName() === CONFIG_FILE_NAME) continue; // skip config file
       var meta = {};
       try { meta = JSON.parse(file.getDescription()); } catch (x) {}
 
