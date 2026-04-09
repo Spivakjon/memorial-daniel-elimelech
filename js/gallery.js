@@ -241,17 +241,6 @@ function renderGallery() {
         }
         (function(i) { div.onclick = function() { openMediaByIndex(i); }; })(filteredIdx);
 
-        if (!photo.isStatic && photo.fileId && photo.category === 'הועלו וטרם מוינו') {
-            var aiBtn = document.createElement('button');
-            aiBtn.className = 'gallery-ai-btn';
-            aiBtn.textContent = 'סווג AI';
-            aiBtn.onclick = function(e) {
-                e.stopPropagation();
-                classifyExistingPhoto(photo, aiBtn);
-            };
-            div.appendChild(aiBtn);
-        }
-
         if (!photo.isStatic && photo.fileId) {
             div.dataset.fileId = photo.fileId;
             div.dataset.url = photo.driveUrl || photo.src;
@@ -292,70 +281,6 @@ function filterByPerson(name) {
     document.getElementById('gallery-section').scrollIntoView({ behavior: 'smooth' });
 }
 
-function smartCategorize(desc, fileName) {
-    var text = (desc + ' ' + fileName).toLowerCase();
-
-    for (var i = 0; i < SITE_CONFIG.coupleWords.length; i++) {
-        if (text.indexOf(SITE_CONFIG.coupleWords[i]) !== -1) return 'זוגי';
-    }
-
-    for (var i = 0; i < SITE_CONFIG.eventWords.length; i++) {
-        if (text.indexOf(SITE_CONFIG.eventWords[i]) !== -1) return 'אירועים';
-    }
-
-    var familyCount = 0;
-    for (var i = 0; i < SITE_CONFIG.familyNames.length; i++) {
-        if (text.indexOf(SITE_CONFIG.familyNames[i]) !== -1) familyCount++;
-    }
-    if (familyCount >= 2) return 'משפחה';
-
-    for (var i = 0; i < SITE_CONFIG.personalWords.length; i++) {
-        if (text.indexOf(SITE_CONFIG.personalWords[i]) !== -1) return 'אישי';
-    }
-
-    if (familyCount >= 1) return 'משפחה';
-    return 'משפחה';
-}
-
-function classifyExistingPhoto(photo, btnEl) {
-    btnEl.textContent = 'מנתח...';
-    btnEl.classList.add('loading');
-
-    setTimeout(function() {
-        var category = smartCategorize(photo.description || '', '');
-        var origDesc = photo.description || '';
-        var newDesc = origDesc.replace(/\[קטגוריה:[^\]]+\]/g, '').trim();
-        newDesc = newDesc + (newDesc ? ' ' : '') + '[קטגוריה:' + category + ']';
-
-        fetch(APPS_SCRIPT_URL, {
-            method: 'POST',
-            body: JSON.stringify({
-                action: 'updateDesc',
-                fileId: photo.fileId,
-                desc: newDesc,
-                pass: SITE_CONFIG.password
-            })
-        })
-        .then(function(r) { return r.json(); })
-        .then(function(data) {
-            if (data.success) {
-                btnEl.textContent = category;
-                btnEl.style.background = '#4a8';
-                setTimeout(function() {
-                    allPhotos = STATIC_PHOTOS.slice();
-                    loadDrivePhotos();
-                }, 800);
-            } else {
-                btnEl.textContent = 'נסה שוב';
-                btnEl.classList.remove('loading');
-            }
-        })
-        .catch(function() {
-            btnEl.textContent = 'נסה שוב';
-            btnEl.classList.remove('loading');
-        });
-    }, 600);
-}
 
 // Upload handling
 function handleFileSelect(e) {
