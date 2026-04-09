@@ -340,20 +340,36 @@ function cancelUpload() {
 }
 
 function submitUpload() {
-    if (!pendingFiles.length || !APPS_SCRIPT_URL) return;
+    if (!pendingFiles.length) {
+        alert('לא נבחרו קבצים');
+        return;
+    }
+    if (!APPS_SCRIPT_URL) {
+        alert('שגיאת הגדרה: לא הוגדר Apps Script URL ב-config.js');
+        return;
+    }
     var description = '';
     var status = document.getElementById('gallery-status');
     var total = pendingFiles.length;
     var uploaded = 0;
+    var failed = 0;
     var btn = document.getElementById('upload-submit-btn');
     btn.disabled = true;
     btn.textContent = 'מעלה...';
+    console.log('[Upload] starting upload of ' + total + ' file(s)');
 
     pendingFiles.forEach(function(file) {
-        uploadToGDrive(file, description, function() {
-            uploaded++;
-            status.textContent = 'הועלו ' + uploaded + ' מתוך ' + total;
-            if (uploaded === total) {
+        uploadToGDrive(file, description, function(ok) {
+            if (ok) uploaded++; else failed++;
+            var done = uploaded + failed;
+            status.textContent = 'הועלו ' + uploaded + ' מתוך ' + total + (failed ? ' (' + failed + ' נכשלו)' : '');
+            if (done === total) {
+                console.log('[Upload] finished. success=' + uploaded + ' failed=' + failed);
+                if (failed === 0) {
+                    alert('הועלו ' + uploaded + ' תמונות בהצלחה!');
+                } else {
+                    alert('הועלו ' + uploaded + ' תמונות, ' + failed + ' נכשלו. בדוק את הקונסול (F12) לפרטים.');
+                }
                 setTimeout(function() {
                     status.textContent = '';
                     cancelUpload();
@@ -361,7 +377,7 @@ function submitUpload() {
                     btn.textContent = 'העלה';
                     allPhotos = STATIC_PHOTOS.slice();
                     loadDrivePhotos();
-                }, 1000);
+                }, 500);
             }
         });
     });
@@ -369,16 +385,18 @@ function submitUpload() {
 
 function uploadToGDrive(file, description, onDone) {
     if (file.size > 50 * 1024 * 1024) {
-        alert('הקובץ גדול מדי (מקסימום 50MB)');
-        onDone();
+        alert('הקובץ "' + file.name + '" גדול מדי (מקסימום 50MB)');
+        onDone(false);
         return;
     }
     var status = document.getElementById('gallery-status');
-    status.textContent = 'קורא קובץ...';
+    status.textContent = 'קורא קובץ ' + file.name + '...';
+    console.log('[Upload] reading file:', file.name, file.size + ' bytes');
 
     var reader = new FileReader();
     reader.onload = function() {
         status.textContent = 'מעלה ל-Google Drive...';
+        console.log('[Upload] sending to Apps Script:', file.name);
         fetch(APPS_SCRIPT_URL, {
             method: 'POST',
             body: JSON.stringify({
@@ -390,13 +408,25 @@ function uploadToGDrive(file, description, onDone) {
         })
         .then(function(r) { return r.json(); })
         .then(function(data) {
-            if (!data.success) alert('שגיאה: ' + (data.error || ''));
-            onDone();
+            if (data.success) {
+                console.log('[Upload] OK:', file.name, '→', data.fileId);
+                onDone(true);
+            } else {
+                console.error('[Upload] FAILED:', file.name, data.error);
+                alert('שגיאה בהעלאת ' + file.name + ': ' + (data.error || 'לא ידוע'));
+                onDone(false);
+            }
         })
         .catch(function(err) {
-            alert('שגיאה: ' + err.message);
-            onDone();
+            console.error('[Upload] network error:', file.name, err);
+            alert('שגיאת רשת ב-' + file.name + ': ' + err.message);
+            onDone(false);
         });
+    };
+    reader.onerror = function() {
+        console.error('[Upload] reader error:', file.name);
+        alert('שגיאה בקריאת ' + file.name);
+        onDone(false);
     };
     reader.readAsDataURL(file);
 }

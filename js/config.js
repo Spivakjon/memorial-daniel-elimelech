@@ -49,23 +49,58 @@ var SITE_CONFIG = {
 
     // ===== עץ משפחה =====
     familyTree: {
-        name: 'דניאל אלימלך ז"ל',
-        spouseName: '',             // שם בן/בת זוג בחיים (למשל: זהבה)
-        spouseLastName: '',         // שם משפחה בן/בת זוג (אם שונה)
-        spouseBirthDate: '',        // תאריך לידה בן/בת זוג
-        spouseAlive: true,          // בן/בת זוג בחיים?
+        name: 'דניאל אלימלך ז"ל וזהבה אלימלך',
+        spouseName: 'זהבה',
+        spouseLastName: '',
+        spouseBirthDate: '',
+        spouseAlive: true,
         info: '',
         level: 'root',
         children: [
-            // TODO: הוסיפו ילדים בפורמט:
-            // {
-            //     name: 'שם ובן/בת זוג',
-            //     info: 'תאריך לידה | תאריך נישואים',
-            //     level: 'child',
-            //     children: [
-            //         { name: 'שם נכד', info: 'תאריך לידה', level: 'gc' }
-            //     ]
-            // }
+            {
+                name: 'יורם וליז אלימלך',
+                info: '',
+                level: 'child',
+                _ed: { firstName: 'יורם', spouseName: 'ליז', lastName: 'אלימלך', birthDate: '', spouseBirthDate: '', weddingDate: '' },
+                children: [
+                    { name: 'עדן ויהונתן', info: '', level: 'gc',
+                      _ed: { firstName: 'עדן', spouseName: 'יהונתן', lastName: '', birthDate: '', spouseBirthDate: '', weddingDate: '' }, children: [] },
+                    { name: 'אור', info: '', level: 'gc',
+                      _ed: { firstName: 'אור', spouseName: '', lastName: '', birthDate: '', spouseBirthDate: '', weddingDate: '' }, children: [] },
+                    { name: 'ירין', info: '', level: 'gc',
+                      _ed: { firstName: 'ירין', spouseName: '', lastName: '', birthDate: '', spouseBirthDate: '', weddingDate: '' }, children: [] }
+                ]
+            },
+            {
+                name: 'מיכל ואיציק',
+                info: '',
+                level: 'child',
+                _ed: { firstName: 'מיכל', spouseName: 'איציק', lastName: '', birthDate: '', spouseBirthDate: '', weddingDate: '' },
+                children: [
+                    { name: 'קרולין ובר', info: '', level: 'gc',
+                      _ed: { firstName: 'קרולין', spouseName: 'בר', lastName: '', birthDate: '', spouseBirthDate: '', weddingDate: '' }, children: [] },
+                    { name: 'קורל ושגב', info: '', level: 'gc',
+                      _ed: { firstName: 'קורל', spouseName: 'שגב', lastName: '', birthDate: '', spouseBirthDate: '', weddingDate: '' }, children: [] },
+                    { name: 'דורין', info: '', level: 'gc',
+                      _ed: { firstName: 'דורין', spouseName: '', lastName: '', birthDate: '', spouseBirthDate: '', weddingDate: '' }, children: [] },
+                    { name: 'איתי', info: '', level: 'gc',
+                      _ed: { firstName: 'איתי', spouseName: '', lastName: '', birthDate: '', spouseBirthDate: '', weddingDate: '' }, children: [] }
+                ]
+            },
+            {
+                name: 'רונן ואורטל אלימלך',
+                info: '',
+                level: 'child',
+                _ed: { firstName: 'רונן', spouseName: 'אורטל', lastName: 'אלימלך', birthDate: '', spouseBirthDate: '', weddingDate: '' },
+                children: [
+                    { name: 'שובל', info: '', level: 'gc',
+                      _ed: { firstName: 'שובל', spouseName: '', lastName: '', birthDate: '', spouseBirthDate: '', weddingDate: '' }, children: [] },
+                    { name: 'אורי', info: '', level: 'gc',
+                      _ed: { firstName: 'אורי', spouseName: '', lastName: '', birthDate: '', spouseBirthDate: '', weddingDate: '' }, children: [] },
+                    { name: 'אריאל', info: '', level: 'gc',
+                      _ed: { firstName: 'אריאל', spouseName: '', lastName: '', birthDate: '', spouseBirthDate: '', weddingDate: '' }, children: [] }
+                ]
+            }
         ]
     },
 
@@ -97,7 +132,7 @@ var SITE_CONFIG = {
     ],
 
     // Google Apps Script URL (הדביקו כאן אחרי Deploy)
-    appsScriptUrl: '',
+    appsScriptUrl: 'https://script.google.com/macros/s/AKfycbxPvAwKrhXJl9wxne_SkmkryuJ_6FXkC_qf2Fs0HnrAwJ5bz76nj4gRnem-1owbl70TYw/exec',
 
     // שם תיקיית Google Drive
     driveFolderName: 'הנצחה דניאל אלימלך - תמונות',

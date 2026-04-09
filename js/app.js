@@ -881,11 +881,17 @@ function saveTreeFromEditor() {
         spouseAlive: SITE_CONFIG.familyTree.spouseAlive
     }));
 
-    // Clean empty child nodes
+    // Clean empty child nodes — keep a node if it has ANY data or any surviving children
     function cleanTree(children) {
         return children.filter(function(c) {
             if (c.children) c.children = cleanTree(c.children);
-            return c._ed && c._ed.firstName && c._ed.firstName.trim() !== '';
+            if (!c._ed) return false;
+            var fields = ['firstName','spouseName','lastName','birthDate','spouseBirthDate','weddingDate'];
+            var hasData = fields.some(function(f) {
+                return (c._ed[f] || '').trim() !== '';
+            });
+            var hasChildren = c.children && c.children.length > 0;
+            return hasData || hasChildren;
         });
     }
     SITE_CONFIG.familyTree.children = cleanTree(SITE_CONFIG.familyTree.children || []);
@@ -1177,13 +1183,36 @@ function applySiteData(data) {
     }
 }
 
+// ==================== Cloud sync toast ====================
+var cloudToastTimer = null;
+function showCloudToast(text, type, durationMs) {
+    var el = document.getElementById('cloud-toast');
+    if (!el) return;
+    el.className = 'cloud-toast ' + (type || 'info');
+    el.textContent = text;
+    if (cloudToastTimer) clearTimeout(cloudToastTimer);
+    if (durationMs > 0) {
+        cloudToastTimer = setTimeout(function() {
+            el.classList.add('hidden');
+        }, durationMs);
+    }
+}
+function hideCloudToast() {
+    var el = document.getElementById('cloud-toast');
+    if (el) el.classList.add('hidden');
+}
+
 // Save all data to cloud
 function saveToCloud(callback) {
     if (!SITE_CONFIG.appsScriptUrl) {
+        console.warn('[Cloud] save skipped — no Apps Script URL');
+        showCloudToast('שמירה לענן לא מוגדרת', 'error', 3000);
         if (callback) callback(false, 'לא הוגדר Apps Script URL');
         return;
     }
     var siteData = collectSiteData();
+    console.log('[Cloud] saving config…', siteData);
+    showCloudToast('שומר בענן…', 'info', 0);
     fetch(SITE_CONFIG.appsScriptUrl, {
         method: 'POST',
         body: JSON.stringify({
@@ -1195,15 +1224,18 @@ function saveToCloud(callback) {
     .then(function(r) { return r.json(); })
     .then(function(res) {
         if (res.success) {
-            console.log('Cloud save OK');
+            console.log('[Cloud] save OK');
+            showCloudToast('נשמר בענן ✓', 'success', 2500);
             if (callback) callback(true);
         } else {
-            console.error('Cloud save failed:', res.error);
+            console.error('[Cloud] save FAILED:', res.error);
+            showCloudToast('שמירה לענן נכשלה: ' + (res.error || ''), 'error', 5000);
             if (callback) callback(false, res.error);
         }
     })
     .catch(function(err) {
-        console.error('Cloud save error:', err);
+        console.error('[Cloud] save network error:', err);
+        showCloudToast('שגיאת רשת בשמירה: ' + err.message, 'error', 5000);
         if (callback) callback(false, err.message);
     });
 }
@@ -1211,22 +1243,30 @@ function saveToCloud(callback) {
 // Load all data from cloud
 function loadFromCloud(callback) {
     if (!SITE_CONFIG.appsScriptUrl) {
+        console.warn('[Cloud] load skipped — no Apps Script URL');
         if (callback) callback(false);
         return;
     }
+    console.log('[Cloud] loading config…');
+    showCloudToast('טוען מהענן…', 'info', 0);
     fetch(SITE_CONFIG.appsScriptUrl + '?action=loadConfig')
         .then(function(r) { return r.json(); })
         .then(function(res) {
+            console.log('[Cloud] load response:', res);
             if (res.success && res.config && Object.keys(res.config).length > 0) {
                 applySiteData(res.config);
-                console.log('Cloud load OK');
+                console.log('[Cloud] load OK — applied', Object.keys(res.config).length, 'keys');
+                showCloudToast('נטען מהענן ✓', 'success', 2000);
                 if (callback) callback(true);
             } else {
+                console.warn('[Cloud] load returned empty config');
+                showCloudToast('אין מידע שמור בענן', 'info', 2500);
                 if (callback) callback(false);
             }
         })
         .catch(function(err) {
-            console.error('Cloud load error:', err);
+            console.error('[Cloud] load error:', err);
+            showCloudToast('שגיאה בטעינה מהענן: ' + err.message, 'error', 5000);
             if (callback) callback(false);
         });
 }
