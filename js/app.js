@@ -1301,6 +1301,13 @@ function renderFullApp() {
     try { updateMemorialAzkara(); } catch(e) { console.error('memAzkara:', e); }
     try { initTreeEditor(); } catch(e) { console.error('treeEditor:', e); }
     try { renderFamilyTree(); } catch(e) { console.error('tree:', e); }
+    // Tree may have changed (manual edit, cloud load) — refresh tag groups
+    try {
+        if (typeof syncFamilyFromTree === 'function') {
+            syncFamilyFromTree();
+            if (typeof renderPeopleFilter === 'function') renderPeopleFilter();
+        }
+    } catch(e) { console.error('syncFamily:', e); }
 }
 
 function initApp() {

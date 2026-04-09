@@ -8,7 +8,58 @@ var activePersonFilter = null;
 var allPhotos = [];
 var pendingFiles = [];
 
+// Walk the family tree and collect tags + groups, so the gallery's
+// people filter and tag panel always reflect the current tree without
+// requiring config.js edits.
+function syncFamilyFromTree() {
+    var tree = SITE_CONFIG.familyTree;
+    if (!tree) return;
+
+    var allNames = [];
+    var groups = [];
+    var seen = {};
+    function add(name) {
+        if (!name) return;
+        name = String(name).trim();
+        if (!name || seen[name]) return;
+        seen[name] = true;
+        allNames.push(name);
+    }
+
+    // Root: deceased + spouse
+    var rootPerson = (SITE_CONFIG.people && SITE_CONFIG.people[0]) || {};
+    var rootFirstName = (rootPerson.name || '').split(' ')[0];
+    var rootMembers = [];
+    if (rootFirstName) { add(rootFirstName); rootMembers.push(rootFirstName); }
+    if (tree.spouseName) { add(tree.spouseName); rootMembers.push(tree.spouseName); }
+    if (rootMembers.length) {
+        groups.push({ label: 'הורים', members: rootMembers });
+    }
+
+    // Each direct child branch becomes its own group (parent + spouse + descendants)
+    (tree.children || []).forEach(function(child) {
+        var ed = child._ed || {};
+        var label = ed.firstName || child.name || 'משפחה';
+        if (ed.spouseName) label = ed.firstName + ' ו' + ed.spouseName;
+        var members = [];
+        function collect(node) {
+            var ned = node._ed || {};
+            if (ned.firstName) { add(ned.firstName); members.push(ned.firstName); }
+            if (ned.spouseName) { add(ned.spouseName); members.push(ned.spouseName); }
+            (node.children || []).forEach(collect);
+        }
+        collect(child);
+        if (members.length) groups.push({ label: 'משפחת ' + label, members: members });
+    });
+
+    SITE_CONFIG.familyNames = allNames;
+    SITE_CONFIG.familyGroups = groups;
+    FAMILY_GROUPS = groups;
+}
+
 function initGallery() {
+    syncFamilyFromTree();
+
     try {
         var saved = JSON.parse(localStorage.getItem('photoTags') || '{}');
         STATIC_PHOTOS.forEach(function(p) {
@@ -558,7 +609,7 @@ function closeLightbox() {
 
 // ==================== PEOPLE TAGGING ====================
 
-var FAMILY_GROUPS = SITE_CONFIG.familyGroups;
+var FAMILY_GROUPS = SITE_CONFIG.familyGroups || [];
 var currentTagFileId = null;
 var currentTagged = [];
 
