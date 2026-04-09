@@ -1237,68 +1237,46 @@ hr {
     font-weight: 500;
 }
 
-/* Vertical line down from parent to children */
+/* Vertical line down from parent */
 .ft-vline {
     width: 2px;
-    height: 18px;
+    height: 16px;
     background: var(--accent);
     flex-shrink: 0;
 }
 
-/* Children area - flex row */
-.ft-kids {
-    display: flex;
-    justify-content: center;
-    gap: 0;
+/* Vertical line up from child to h-bar */
+.ft-vline-up {
+    width: 2px;
+    height: 16px;
+    background: var(--accent);
+    margin: 0 auto;
+    flex-shrink: 0;
 }
 
-/* Each child column */
+/* Children area */
+.ft-kids {
+    position: relative;
+}
+
+/* Horizontal line - positioned by JS */
+.ft-hline {
+    background: var(--accent);
+    height: 2px;
+    position: absolute;
+    top: 0;
+}
+
+.ft-kids-row {
+    display: flex;
+    justify-content: center;
+    gap: 10px;
+}
+
 .ft-kid-col {
     display: flex;
     flex-direction: column;
     align-items: center;
-    position: relative;
-    padding: 0 8px;
-}
-
-/* Horizontal bar + vertical stub via ::before on each kid-col */
-/* The horizontal bar is the top border, the vertical stub is a pseudo going down to the node */
-.ft-kid-col::before {
-    content: '';
-    display: block;
-    width: 100%;
-    height: 18px;
-    border-top: 2px solid var(--accent);
-    box-sizing: border-box;
-}
-
-/* First child: bar only on left half (RTL: right half visually) */
-.ft-kid-col.ft-first::before {
-    width: 50%;
-    margin-left: 50%;
-}
-
-/* Last child: bar only on right half */
-.ft-kid-col.ft-last::before {
-    width: 50%;
-    margin-right: 50%;
-}
-
-/* Single child: no horizontal bar, just vertical */
-.ft-single .ft-kid-col::before {
-    border-top: none;
-}
-
-/* Vertical stub from h-bar down to node */
-.ft-kid-col::after {
-    content: '';
-    position: absolute;
-    top: 0;
-    left: 50%;
-    transform: translateX(-50%);
-    width: 2px;
-    height: 18px;
-    background: var(--accent);
 }
 
 /* Tooltip */
@@ -1340,10 +1318,9 @@ hr {
     .ft-child { font-size: 0.78rem; padding: 0.4rem 0.75rem; }
     .ft-gc { font-size: 0.7rem; padding: 0.32rem 0.55rem; }
     .ft-ggc { font-size: 0.65rem; padding: 0.25rem 0.45rem; }
-    .ft-vline { height: 14px; }
-    .ft-kid-col { padding: 0 4px; }
-    .ft-kid-col::before { height: 14px; }
-    .ft-kid-col::after { height: 14px; }
+    .ft-vline, .ft-vline-up { height: 12px; }
+    .ft-kids-row { gap: 6px; }
+    .ft-kid-col { padding: 0 2px; }
 }
 
 /* ===== Gallery ===== */

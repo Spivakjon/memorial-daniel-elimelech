@@ -78,7 +78,12 @@ function renderFamilyTree() {
     var section = document.getElementById('family-tree-section');
     if (section) section.style.display = 'block';
 
-    container.innerHTML = '<div class="ft">' + renderNode(FAMILY_DATA) + '</div>';
+    container.innerHTML = '<div class="ft" id="ft-root">' + renderNode(FAMILY_DATA) + '</div>';
+
+    // Position horizontal connectors after the DOM has laid out
+    setTimeout(positionHLines, 50);
+    window.removeEventListener('resize', positionHLines);
+    window.addEventListener('resize', positionHLines);
 
     // Tooltips
     container.querySelectorAll('.ft-node[data-info]').forEach(function(el) {
@@ -102,23 +107,50 @@ function renderNode(node) {
 
     if (hasKids) {
         h += '<div class="ft-vline"></div>';
-        var count = node.children.length;
-        h += '<div class="ft-kids' + (count === 1 ? ' ft-single' : '') + '">';
-        node.children.forEach(function(kid, i) {
-            var colCls = 'ft-kid-col';
-            if (count > 1) {
-                if (i === 0) colCls += ' ft-first';
-                else if (i === count - 1) colCls += ' ft-last';
-                else colCls += ' ft-mid';
-            }
-            h += '<div class="' + colCls + '">';
+        h += '<div class="ft-kids">';
+        h += '<div class="ft-hline"></div>'; // positioned by JS
+        h += '<div class="ft-kids-row">';
+        node.children.forEach(function(kid) {
+            h += '<div class="ft-kid-col">';
+            h += '<div class="ft-vline-up"></div>';
             h += renderNode(kid);
             h += '</div>';
         });
-        h += '</div>';
+        h += '</div></div>';
     }
     h += '</div>';
     return h;
+}
+
+// Position the horizontal connector lines based on the actual DOM layout
+function positionHLines() {
+    document.querySelectorAll('.ft-kids').forEach(function(kids) {
+        var hline = kids.querySelector(':scope > .ft-hline');
+        var row = kids.querySelector(':scope > .ft-kids-row');
+        if (!hline || !row) return;
+
+        var cols = row.querySelectorAll(':scope > .ft-kid-col');
+        if (cols.length < 2) { hline.style.display = 'none'; return; }
+
+        var first = cols[0];
+        var last = cols[cols.length - 1];
+        var rowRect = row.getBoundingClientRect();
+        var firstRect = first.getBoundingClientRect();
+        var lastRect = last.getBoundingClientRect();
+
+        var leftPos = firstRect.left + firstRect.width / 2 - rowRect.left;
+        var rightPos = lastRect.left + lastRect.width / 2 - rowRect.left;
+
+        var l = Math.min(leftPos, rightPos);
+        var r = Math.max(leftPos, rightPos);
+
+        hline.style.display = 'block';
+        hline.style.position = 'absolute';
+        hline.style.top = '0';
+        hline.style.left = l + 'px';
+        hline.style.width = (r - l) + 'px';
+        hline.style.height = '2px';
+    });
 }
 
 // Tooltips
