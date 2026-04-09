@@ -80,10 +80,17 @@ function renderFamilyTree() {
 
     container.innerHTML = '<div class="ft" id="ft-root">' + renderNode(FAMILY_DATA) + '</div>';
 
-    // Position horizontal connectors after the DOM has laid out
-    setTimeout(positionHLines, 50);
+    // Position horizontal connectors after the DOM has laid out.
+    // Run multiple times to survive late font loads / re-flows.
+    requestAnimationFrame(positionHLines);
+    setTimeout(positionHLines, 60);
+    setTimeout(positionHLines, 250);
+    setTimeout(positionHLines, 800);
     window.removeEventListener('resize', positionHLines);
     window.addEventListener('resize', positionHLines);
+    if (document.fonts && document.fonts.ready) {
+        document.fonts.ready.then(positionHLines);
+    }
 
     // Tooltips
     container.querySelectorAll('.ft-node[data-info]').forEach(function(el) {
@@ -122,35 +129,63 @@ function renderNode(node) {
     return h;
 }
 
+// Find a direct child of `parent` that has `cls` (avoids :scope CSS selector
+// which has spotty support in some browsers).
+function ftDirectChild(parent, cls) {
+    if (!parent) return null;
+    for (var i = 0; i < parent.children.length; i++) {
+        if (parent.children[i].classList.contains(cls)) return parent.children[i];
+    }
+    return null;
+}
+function ftDirectChildren(parent, cls) {
+    var out = [];
+    if (!parent) return out;
+    for (var i = 0; i < parent.children.length; i++) {
+        if (parent.children[i].classList.contains(cls)) out.push(parent.children[i]);
+    }
+    return out;
+}
+
 // Position the horizontal connector lines based on the actual DOM layout
 function positionHLines() {
-    document.querySelectorAll('.ft-kids').forEach(function(kids) {
-        var hline = kids.querySelector(':scope > .ft-hline');
-        var row = kids.querySelector(':scope > .ft-kids-row');
+    var groups = document.querySelectorAll('.ft-kids');
+    if (!groups.length) return;
+    var positioned = 0;
+    groups.forEach(function(kids) {
+        var hline = ftDirectChild(kids, 'ft-hline');
+        var row = ftDirectChild(kids, 'ft-kids-row');
         if (!hline || !row) return;
 
-        var cols = row.querySelectorAll(':scope > .ft-kid-col');
+        var cols = ftDirectChildren(row, 'ft-kid-col');
         if (cols.length < 2) { hline.style.display = 'none'; return; }
 
         var first = cols[0];
         var last = cols[cols.length - 1];
-        var rowRect = row.getBoundingClientRect();
+        var kidsRect = kids.getBoundingClientRect();
         var firstRect = first.getBoundingClientRect();
         var lastRect = last.getBoundingClientRect();
 
-        var leftPos = firstRect.left + firstRect.width / 2 - rowRect.left;
-        var rightPos = lastRect.left + lastRect.width / 2 - rowRect.left;
+        // X-center of first and last child, RELATIVE TO .ft-kids
+        // (the hline's offset parent — it has position:relative).
+        var leftPos = firstRect.left + firstRect.width / 2 - kidsRect.left;
+        var rightPos = lastRect.left + lastRect.width / 2 - kidsRect.left;
 
         var l = Math.min(leftPos, rightPos);
         var r = Math.max(leftPos, rightPos);
 
+        if (r - l < 1) return; // skip degenerate (layout not ready yet)
         hline.style.display = 'block';
         hline.style.position = 'absolute';
         hline.style.top = '0';
         hline.style.left = l + 'px';
         hline.style.width = (r - l) + 'px';
         hline.style.height = '2px';
+        positioned++;
     });
+    if (window.console && positioned > 0) {
+        console.log('[Tree] positioned ' + positioned + ' horizontal lines');
+    }
 }
 
 // Tooltips
