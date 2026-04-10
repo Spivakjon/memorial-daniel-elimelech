@@ -548,43 +548,145 @@ function startTaggingHelpMode() {
         return !p.isStatic && p.fileId && (!p.people || p.people.length === 0);
     });
     if (untagged.length === 0) {
-        alert('כל התמונות כבר מתויגות 🎉');
+        alert('כל התמונות כבר מתויגות!');
         return;
     }
-    helpTagQueue = untagged.map(function(p) { return p.fileId; });
+    helpTagQueue = untagged.slice();
     helpTagIndex = 0;
     helpTagActive = true;
-    openHelpTagPhoto();
+    showHelpTagStep('view');
 }
 
-function openHelpTagPhoto() {
-    if (!helpTagActive || helpTagIndex >= helpTagQueue.length) {
-        exitHelpTagMode(true);
-        return;
-    }
-    var fileId = helpTagQueue[helpTagIndex];
-    // Find the photo's index in the currently filtered view, or just open by fileId
-    var idx = -1;
+function getHelpTagPhoto() {
+    if (helpTagIndex >= helpTagQueue.length) return null;
+    var fileId = helpTagQueue[helpTagIndex].fileId;
     for (var i = 0; i < allPhotos.length; i++) {
-        if (allPhotos[i].fileId === fileId) { idx = i; break; }
+        if (allPhotos[i].fileId === fileId) return allPhotos[i];
     }
-    if (idx === -1) { // photo gone — skip
-        helpTagIndex++;
-        openHelpTagPhoto();
+    return null;
+}
+
+function showHelpTagStep(step) {
+    // Remove any existing wizard overlay
+    var old = document.getElementById('help-tag-wizard');
+    if (old) old.remove();
+
+    var photo = getHelpTagPhoto();
+    if (!photo) { exitHelpTagMode(true); return; }
+
+    var src = photo.fullSrc || photo.src;
+    var progress = (helpTagIndex + 1) + ' / ' + helpTagQueue.length;
+
+    var overlay = document.createElement('div');
+    overlay.className = 'htw-overlay';
+    overlay.id = 'help-tag-wizard';
+
+    if (step === 'view') {
+        // Step 1: View the photo
+        overlay.innerHTML =
+            '<div class="htw-topbar">' +
+                '<span class="htw-progress">' + progress + '</span>' +
+                '<button class="htw-exit-btn" onclick="exitHelpTagMode(false)">✕</button>' +
+            '</div>' +
+            '<div class="htw-photo-full">' +
+                '<img src="' + src + '" alt="">' +
+            '</div>' +
+            '<div class="htw-bottom-actions">' +
+                '<button class="htw-primary-btn" onclick="showHelpTagStep(\'tag\')">תייגו את התמונה</button>' +
+                '<button class="htw-skip-btn" onclick="helpTagSkip()">דלג</button>' +
+            '</div>';
+    } else {
+        // Step 2: Tag people
+        currentTagFileId = photo.fileId;
+        currentTagged = getTaggedPeople(photo.fileId).slice();
+
+        var groupsHtml = '';
+        FAMILY_GROUPS.forEach(function(group) {
+            groupsHtml += '<div class="htw-tag-group">';
+            groupsHtml += '<p class="htw-group-label">' + group.label + '</p>';
+            groupsHtml += '<div class="htw-group-members">';
+            group.members.forEach(function(name) {
+                var isTagged = currentTagged.indexOf(name) !== -1;
+                groupsHtml += '<button class="htw-member-btn' + (isTagged ? ' tagged' : '') + '" onclick="toggleHelpTag(this,\'' + name.replace(/'/g, "\\'") + '\')">' + name + '</button>';
+            });
+            groupsHtml += '</div></div>';
+        });
+
+        overlay.innerHTML =
+            '<div class="htw-topbar">' +
+                '<span class="htw-progress">' + progress + '</span>' +
+                '<button class="htw-exit-btn" onclick="exitHelpTagMode(false)">✕</button>' +
+            '</div>' +
+            '<div class="htw-photo-thumb" onclick="showHelpTagStep(\'view\')">' +
+                '<img src="' + src + '" alt="">' +
+                '<span class="htw-back-hint">לחצו לחזור לתמונה</span>' +
+            '</div>' +
+            '<div class="htw-tags-area">' + groupsHtml + '</div>' +
+            '<div class="htw-bottom-actions">' +
+                '<button class="htw-primary-btn" onclick="saveHelpTag()">שמור והבא</button>' +
+                '<button class="htw-back-btn" onclick="showHelpTagStep(\'view\')">חזרה לתמונה</button>' +
+                '<button class="htw-skip-btn" onclick="helpTagSkip()">דלג</button>' +
+            '</div>';
+    }
+
+    document.body.appendChild(overlay);
+}
+
+function toggleHelpTag(btn, name) {
+    var idx = currentTagged.indexOf(name);
+    if (idx !== -1) {
+        currentTagged.splice(idx, 1);
+        btn.classList.remove('tagged');
+    } else {
+        currentTagged.push(name);
+        btn.classList.add('tagged');
+    }
+}
+
+function saveHelpTag() {
+    if (!currentTagFileId || currentTagged.length === 0) {
+        helpTagSkip();
         return;
     }
-    // Set filter so the lightbox iteration matches our queue order
-    activePersonFilter = null;
-    activeFilter = 'הכל';
-    lbFilteredPhotos = allPhotos.slice();
-    var lbIdx = -1;
-    for (var j = 0; j < lbFilteredPhotos.length; j++) {
-        if (lbFilteredPhotos[j].fileId === fileId) { lbIdx = j; break; }
-    }
-    if (lbIdx === -1) { helpTagIndex++; openHelpTagPhoto(); return; }
-    openMediaByIndex(lbIdx);
-    // Open the tag panel automatically after the lightbox is created
-    setTimeout(function() { openTagPanel(fileId); }, 50);
+    // Show saving state
+    var btn = document.querySelector('.htw-primary-btn');
+    if (btn) { btn.textContent = 'שומר...'; btn.disabled = true; }
+
+    // Build new description with tags
+    var desc = '';
+    allPhotos.forEach(function(p) {
+        if (p.fileId === currentTagFileId) desc = p.description || '';
+    });
+    desc = desc.replace(/\[אנשים:[^\]]*\]/g, '').trim();
+    desc = desc + (desc ? ' ' : '') + '[אנשים:' + currentTagged.join(',') + ']';
+
+    fetch(APPS_SCRIPT_URL, {
+        method: 'POST',
+        body: JSON.stringify({ action: 'updateDesc', fileId: currentTagFileId, desc: desc, pass: SITE_CONFIG.password })
+    })
+    .then(function(r) { return r.json(); })
+    .then(function(data) {
+        if (data.success) {
+            // Update local cache
+            allPhotos.forEach(function(p) {
+                if (p.fileId === currentTagFileId) p.people = currentTagged.slice();
+            });
+            helpTagIndex++;
+            showHelpTagStep('view');
+        } else {
+            alert(data.error || 'שגיאה');
+            if (btn) { btn.textContent = 'שמור והבא'; btn.disabled = false; }
+        }
+    })
+    .catch(function(err) {
+        alert('שגיאה: ' + err.message);
+        if (btn) { btn.textContent = 'שמור והבא'; btn.disabled = false; }
+    });
+}
+
+function helpTagSkip() {
+    helpTagIndex++;
+    showHelpTagStep('view');
 }
 
 function exitHelpTagMode(showSummary) {
@@ -593,14 +695,16 @@ function exitHelpTagMode(showSummary) {
     helpTagActive = false;
     helpTagQueue = [];
     helpTagIndex = 0;
-    closeTagPanel();
-    closeLightbox();
+    currentTagFileId = null;
+    currentTagged = [];
+    var wiz = document.getElementById('help-tag-wizard');
+    if (wiz) wiz.remove();
     allPhotos = STATIC_PHOTOS.slice();
     if (APPS_SCRIPT_URL) loadDrivePhotos();
     else renderGallery();
-    if (showSummary && total > 0) {
+    if (showSummary && done > 0) {
         setTimeout(function() {
-            alert('סיימת לתייג ' + done + ' מתוך ' + total + ' תמונות. תודה!');
+            alert('תויגו ' + done + ' מתוך ' + total + ' תמונות. תודה!');
         }, 200);
     }
 }
@@ -626,21 +730,8 @@ function openTagPanel(fileId) {
     var panel = document.getElementById('tag-panel');
     if (!panel) return;
     panel.classList.remove('hidden');
-    // In help-tag mode, dock the panel at bottom so the photo stays visible
-    if (helpTagActive) {
-        panel.classList.add('tag-panel-bottom');
-        // Shrink the lightbox image to leave room for the bottom panel
-        var lb = document.getElementById('active-lightbox');
-        if (lb) lb.classList.add('lb-split');
-    } else {
-        panel.classList.remove('tag-panel-bottom');
-    }
 
-    var headerExtra = '';
-    if (helpTagActive) {
-        headerExtra = ' <span class="tag-help-progress">' + (helpTagIndex + 1) + ' / ' + helpTagQueue.length + '</span>';
-    }
-    var html = '<div class="tag-header"><h4>תייגו מי בתמונה' + headerExtra + '</h4></div>';
+    var html = '<div class="tag-header"><h4>תייגו מי בתמונה</h4></div>';
     html += '<div class="tag-groups">';
 
     FAMILY_GROUPS.forEach(function(group) {
@@ -656,25 +747,11 @@ function openTagPanel(fileId) {
 
     html += '</div>';
     html += '<div class="tag-actions">';
-    if (helpTagActive) {
-        html += '<button class="tag-save-btn" onclick="saveTagging()">שמור והבא</button>';
-        html += '<button class="tag-skip-btn" onclick="helpTagSkip()">דלג</button>';
-        html += '<button class="tag-cancel-btn" onclick="exitHelpTagMode(false)">סיום</button>';
-    } else {
-        html += '<button class="tag-save-btn" onclick="saveTagging()">שמור</button>';
-        html += '<button class="tag-cancel-btn" onclick="closeTagPanel()">ביטול</button>';
-    }
+    html += '<button class="tag-save-btn" onclick="saveTagging()">שמור</button>';
+    html += '<button class="tag-cancel-btn" onclick="closeTagPanel()">ביטול</button>';
     html += '</div>';
 
     panel.innerHTML = html;
-}
-
-function helpTagSkip() {
-    if (!helpTagActive) return;
-    helpTagIndex++;
-    closeTagPanel();
-    closeLightbox();
-    setTimeout(openHelpTagPhoto, 50);
 }
 
 function toggleTag(btn, name) {
@@ -752,20 +829,6 @@ function saveTagging() {
 }
 
 function finishTagSave() {
-    if (helpTagActive) {
-        // Optimistically update the photo's people in our local cache so the
-        // queue advance doesn't need a roundtrip to Drive.
-        var savedFileId = currentTagFileId;
-        var savedTags = currentTagged.slice();
-        allPhotos.forEach(function(p) {
-            if (p.fileId === savedFileId) p.people = savedTags;
-        });
-        helpTagIndex++;
-        closeTagPanel();
-        closeLightbox();
-        setTimeout(openHelpTagPhoto, 50);
-        return;
-    }
     closeTagPanel();
     closeLightbox();
     allPhotos = STATIC_PHOTOS.slice();
