@@ -626,6 +626,15 @@ function openTagPanel(fileId) {
     var panel = document.getElementById('tag-panel');
     if (!panel) return;
     panel.classList.remove('hidden');
+    // In help-tag mode, dock the panel at bottom so the photo stays visible
+    if (helpTagActive) {
+        panel.classList.add('tag-panel-bottom');
+        // Shrink the lightbox image to leave room for the bottom panel
+        var lb = document.getElementById('active-lightbox');
+        if (lb) lb.classList.add('lb-split');
+    } else {
+        panel.classList.remove('tag-panel-bottom');
+    }
 
     var headerExtra = '';
     if (helpTagActive) {

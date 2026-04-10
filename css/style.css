@@ -1866,6 +1866,28 @@ hr {
     border: 1px solid rgba(255,255,255,0.1);
 }
 
+/* Help-tag mode: dock panel at bottom, photo stays on top */
+.tag-panel.tag-panel-bottom {
+    top: auto;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    transform: none;
+    width: 100%;
+    max-width: 100%;
+    max-height: 50vh;
+    border-radius: 16px 16px 0 0;
+    padding: 1rem 1.5rem;
+}
+
+/* Shrink image when bottom panel is open */
+.lb-split .lb-content img {
+    max-height: 42vh;
+}
+.lb-split .lb-bottom {
+    display: none;
+}
+
 .tag-header h4 {
     color: #fff;
     text-align: center;
