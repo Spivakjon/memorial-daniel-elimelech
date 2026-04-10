@@ -577,59 +577,126 @@ function showHelpTagStep(step) {
     var src = photo.fullSrc || photo.src;
     var progress = (helpTagIndex + 1) + ' / ' + helpTagQueue.length;
 
+    currentTagFileId = photo.fileId;
+    currentTagged = getTaggedPeople(photo.fileId).slice();
+
+    // Build family group buttons (collapsed by default)
+    var groupBtnsHtml = '';
+    FAMILY_GROUPS.forEach(function(group, gi) {
+        var hasTagged = false;
+        group.members.forEach(function(name) {
+            if (currentTagged.indexOf(name) !== -1) hasTagged = true;
+        });
+        groupBtnsHtml += '<button class="htw-family-btn' + (hasTagged ? ' has-tagged' : '') + '" onclick="toggleFamilyPopup(' + gi + ', this)">' + group.label + '</button>';
+    });
+
     var overlay = document.createElement('div');
     overlay.className = 'htw-overlay';
     overlay.id = 'help-tag-wizard';
 
-    if (step === 'view') {
-        // Step 1: View the photo
-        overlay.innerHTML =
-            '<div class="htw-topbar">' +
-                '<span class="htw-progress">' + progress + '</span>' +
-                '<button class="htw-exit-btn" onclick="exitHelpTagMode(false)">✕</button>' +
-            '</div>' +
-            '<div class="htw-photo-full">' +
-                '<img src="' + src + '" alt="">' +
-            '</div>' +
-            '<div class="htw-bottom-actions">' +
-                '<button class="htw-primary-btn" onclick="showHelpTagStep(\'tag\')">תייגו את התמונה</button>' +
-                '<button class="htw-skip-btn" onclick="helpTagSkip()">דלג</button>' +
-            '</div>';
-    } else {
-        // Step 2: Tag people
-        currentTagFileId = photo.fileId;
-        currentTagged = getTaggedPeople(photo.fileId).slice();
-
-        var groupsHtml = '';
-        FAMILY_GROUPS.forEach(function(group) {
-            groupsHtml += '<div class="htw-tag-group">';
-            groupsHtml += '<p class="htw-group-label">' + group.label + '</p>';
-            groupsHtml += '<div class="htw-group-members">';
-            group.members.forEach(function(name) {
-                var isTagged = currentTagged.indexOf(name) !== -1;
-                groupsHtml += '<button class="htw-member-btn' + (isTagged ? ' tagged' : '') + '" onclick="toggleHelpTag(this,\'' + name.replace(/'/g, "\\'") + '\')">' + name + '</button>';
-            });
-            groupsHtml += '</div></div>';
-        });
-
-        overlay.innerHTML =
-            '<div class="htw-topbar">' +
-                '<span class="htw-progress">' + progress + '</span>' +
-                '<button class="htw-exit-btn" onclick="exitHelpTagMode(false)">✕</button>' +
-            '</div>' +
-            '<div class="htw-photo-thumb" onclick="showHelpTagStep(\'view\')">' +
-                '<img src="' + src + '" alt="">' +
-                '<span class="htw-back-hint">לחצו לחזור לתמונה</span>' +
-            '</div>' +
-            '<div class="htw-tags-area">' + groupsHtml + '</div>' +
-            '<div class="htw-bottom-actions">' +
-                '<button class="htw-primary-btn" onclick="saveHelpTag()">שמור והבא</button>' +
-                '<button class="htw-back-btn" onclick="showHelpTagStep(\'view\')">חזרה לתמונה</button>' +
-                '<button class="htw-skip-btn" onclick="helpTagSkip()">דלג</button>' +
-            '</div>';
-    }
+    // Single-screen layout: photo always visible, compact tag bar at bottom
+    overlay.innerHTML =
+        '<div class="htw-topbar">' +
+            '<span class="htw-progress">' + progress + '</span>' +
+            '<button class="htw-exit-btn" onclick="exitHelpTagMode(false)">✕</button>' +
+        '</div>' +
+        '<div class="htw-photo-full">' +
+            '<img src="' + src + '" alt="">' +
+        '</div>' +
+        '<div class="htw-tagged-summary" id="htw-tagged-summary"></div>' +
+        '<div class="htw-family-bar">' + groupBtnsHtml + '</div>' +
+        '<div class="htw-bottom-actions">' +
+            '<button class="htw-primary-btn" onclick="saveHelpTag()">שמור והבא</button>' +
+            '<button class="htw-skip-btn" onclick="helpTagSkip()">דלג</button>' +
+        '</div>';
 
     document.body.appendChild(overlay);
+    updateTaggedSummary();
+}
+
+function updateTaggedSummary() {
+    var el = document.getElementById('htw-tagged-summary');
+    if (!el) return;
+    if (currentTagged.length === 0) {
+        el.innerHTML = '<span class="htw-summary-hint">בחרו משפחה למטה כדי לתייג</span>';
+    } else {
+        el.innerHTML = currentTagged.map(function(n) {
+            return '<span class="htw-summary-tag">' + n + ' <span class="htw-remove-tag" onclick="removeHelpTag(\'' + n.replace(/'/g, "\\'") + '\')">✕</span></span>';
+        }).join('');
+    }
+}
+
+function removeHelpTag(name) {
+    var idx = currentTagged.indexOf(name);
+    if (idx !== -1) currentTagged.splice(idx, 1);
+    updateTaggedSummary();
+    // Update button state in open popup if any
+    var popup = document.getElementById('htw-family-popup');
+    if (popup) {
+        var btns = popup.querySelectorAll('.htw-member-btn');
+        for (var i = 0; i < btns.length; i++) {
+            if (btns[i].getAttribute('data-name') === name) {
+                btns[i].classList.remove('tagged');
+            }
+        }
+    }
+    // Update family button highlight
+    updateFamilyBtnHighlights();
+}
+
+function updateFamilyBtnHighlights() {
+    var famBtns = document.querySelectorAll('.htw-family-btn');
+    for (var i = 0; i < famBtns.length; i++) {
+        var gi = i;
+        var group = FAMILY_GROUPS[gi];
+        var hasTagged = false;
+        if (group) {
+            group.members.forEach(function(name) {
+                if (currentTagged.indexOf(name) !== -1) hasTagged = true;
+            });
+        }
+        if (hasTagged) famBtns[i].classList.add('has-tagged');
+        else famBtns[i].classList.remove('has-tagged');
+    }
+}
+
+function toggleFamilyPopup(groupIndex, btn) {
+    var existing = document.getElementById('htw-family-popup');
+    if (existing) {
+        var prevIndex = existing.getAttribute('data-group');
+        existing.remove();
+        // If same group clicked, just close
+        if (parseInt(prevIndex) === groupIndex) return;
+    }
+
+    var group = FAMILY_GROUPS[groupIndex];
+    if (!group) return;
+
+    var membersHtml = '';
+    group.members.forEach(function(name) {
+        var isTagged = currentTagged.indexOf(name) !== -1;
+        membersHtml += '<button class="htw-member-btn' + (isTagged ? ' tagged' : '') + '" data-name="' + name.replace(/"/g, '&quot;') + '" onclick="toggleHelpTag(this,\'' + name.replace(/'/g, "\\'") + '\')">' + name + '</button>';
+    });
+
+    var popup = document.createElement('div');
+    popup.className = 'htw-family-popup';
+    popup.id = 'htw-family-popup';
+    popup.setAttribute('data-group', groupIndex);
+    popup.innerHTML =
+        '<div class="htw-popup-header">' +
+            '<span>' + group.label + '</span>' +
+            '<button class="htw-popup-close" onclick="closeFamilyPopup()">✕</button>' +
+        '</div>' +
+        '<div class="htw-popup-members">' + membersHtml + '</div>';
+
+    // Position the popup above the button
+    var bar = document.querySelector('.htw-family-bar');
+    if (bar) bar.appendChild(popup);
+}
+
+function closeFamilyPopup() {
+    var popup = document.getElementById('htw-family-popup');
+    if (popup) popup.remove();
 }
 
 function toggleHelpTag(btn, name) {
@@ -641,6 +708,8 @@ function toggleHelpTag(btn, name) {
         currentTagged.push(name);
         btn.classList.add('tagged');
     }
+    updateTaggedSummary();
+    updateFamilyBtnHighlights();
 }
 
 function saveHelpTag() {

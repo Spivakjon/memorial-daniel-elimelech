@@ -1904,7 +1904,7 @@ hr {
 }
 .htw-exit-btn:hover { color: #fff; }
 
-/* Step 1: full-size photo */
+/* Photo area – always large */
 .htw-photo-full {
     flex: 1;
     display: flex;
@@ -1912,6 +1912,7 @@ hr {
     justify-content: center;
     overflow: hidden;
     padding: 0 0.5rem;
+    min-height: 0;
 }
 .htw-photo-full img {
     max-width: 100%;
@@ -1920,44 +1921,111 @@ hr {
     border-radius: 6px;
 }
 
-/* Step 2: thumbnail */
-.htw-photo-thumb {
+/* Tagged people summary */
+.htw-tagged-summary {
     flex-shrink: 0;
-    text-align: center;
-    padding: 0.5rem;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    padding: 0.3rem 1rem;
+    justify-content: center;
+    min-height: 1.6rem;
+    align-items: center;
+}
+.htw-summary-hint {
+    font-size: 0.78rem;
+    color: #777;
+}
+.htw-summary-tag {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    background: var(--accent);
+    color: #fff;
+    padding: 2px 10px;
+    border-radius: 999px;
+    font-size: 0.78rem;
+    font-weight: 600;
+}
+.htw-remove-tag {
     cursor: pointer;
+    opacity: 0.7;
+    font-size: 0.7rem;
+}
+.htw-remove-tag:hover { opacity: 1; }
+
+/* Compact family bar */
+.htw-family-bar {
+    flex-shrink: 0;
+    display: flex;
+    gap: 6px;
+    padding: 0.3rem 1rem;
+    justify-content: center;
+    flex-wrap: wrap;
     position: relative;
 }
-.htw-photo-thumb img {
-    max-height: 22vh;
-    max-width: 90%;
-    object-fit: contain;
-    border-radius: 6px;
-    border: 2px solid rgba(255,255,255,0.15);
+.htw-family-btn {
+    padding: 0.35rem 1rem;
+    border-radius: 999px;
+    border: 1.5px solid rgba(255,255,255,0.25);
+    background: rgba(255,255,255,0.08);
+    color: #ccc;
+    font-size: 0.82rem;
+    cursor: pointer;
+    font-family: inherit;
+    transition: all 0.15s;
 }
-.htw-back-hint {
-    display: block;
-    font-size: 0.72rem;
-    color: #888;
-    margin-top: 0.25rem;
+.htw-family-btn:hover {
+    border-color: var(--accent);
+    color: #fff;
+    background: rgba(255,255,255,0.12);
+}
+.htw-family-btn.has-tagged {
+    border-color: var(--accent);
+    color: var(--accent);
+    font-weight: 600;
 }
 
-/* Tag groups */
-.htw-tags-area {
-    flex: 1;
-    overflow-y: auto;
-    padding: 0 1rem;
+/* Floating popup for family members */
+.htw-family-popup {
+    position: absolute;
+    bottom: calc(100% + 8px);
+    left: 50%;
+    transform: translateX(-50%);
+    background: #1e1e24;
+    border: 1px solid rgba(255,255,255,0.15);
+    border-radius: 14px;
+    padding: 0.6rem 0.8rem;
+    min-width: 200px;
+    max-width: 90vw;
+    box-shadow: 0 -4px 24px rgba(0,0,0,0.5);
+    z-index: 3100;
+    animation: htw-popup-in 0.15s ease-out;
 }
-.htw-tag-group {
-    margin-bottom: 0.75rem;
+@keyframes htw-popup-in {
+    from { opacity: 0; transform: translateX(-50%) translateY(8px); }
+    to   { opacity: 1; transform: translateX(-50%) translateY(0); }
 }
-.htw-group-label {
-    font-size: 0.82rem;
-    color: #aaa;
-    margin-bottom: 0.3rem;
-    font-weight: 500;
+.htw-popup-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 0.5rem;
+    color: var(--accent);
+    font-size: 0.85rem;
+    font-weight: 600;
 }
-.htw-group-members {
+.htw-popup-close {
+    background: none;
+    border: none;
+    color: #888;
+    font-size: 1.1rem;
+    cursor: pointer;
+    padding: 0 0.2rem;
+    line-height: 1;
+}
+.htw-popup-close:hover { color: #fff; }
+.htw-popup-members {
     display: flex;
     flex-wrap: wrap;
     gap: 6px;
@@ -2007,7 +2075,7 @@ hr {
 }
 .htw-primary-btn:hover { opacity: 0.9; }
 .htw-primary-btn:disabled { opacity: 0.5; cursor: wait; }
-.htw-back-btn, .htw-skip-btn {
+.htw-skip-btn {
     background: rgba(255,255,255,0.1);
     border: 1px solid rgba(255,255,255,0.2);
     color: #ccc;
@@ -2017,9 +2085,59 @@ hr {
     cursor: pointer;
     font-family: inherit;
 }
-.htw-back-btn:hover, .htw-skip-btn:hover {
+.htw-skip-btn:hover {
     background: rgba(255,255,255,0.2);
     color: #fff;
+}
+
+/* Mobile optimizations for help-tag wizard */
+@media (max-width: 600px) {
+    .htw-family-bar {
+        padding: 0.3rem 0.5rem;
+        gap: 5px;
+    }
+    .htw-family-btn {
+        padding: 0.3rem 0.7rem;
+        font-size: 0.75rem;
+    }
+    .htw-family-popup {
+        left: 5%;
+        right: 5%;
+        transform: none;
+        max-width: none;
+        min-width: 0;
+    }
+    @keyframes htw-popup-in {
+        from { opacity: 0; transform: translateY(8px); }
+        to   { opacity: 1; transform: translateY(0); }
+    }
+    .htw-member-btn {
+        padding: 0.3rem 0.7rem;
+        font-size: 0.8rem;
+    }
+    .htw-tagged-summary {
+        padding: 0.2rem 0.5rem;
+        gap: 4px;
+    }
+    .htw-summary-tag {
+        padding: 2px 8px;
+        font-size: 0.72rem;
+    }
+    .htw-bottom-actions {
+        padding: 0.5rem 0.5rem;
+        gap: 0.4rem;
+    }
+    .htw-primary-btn {
+        padding: 0.5rem 1.2rem;
+        font-size: 0.9rem;
+    }
+    .htw-skip-btn {
+        padding: 0.4rem 0.8rem;
+        font-size: 0.82rem;
+    }
+    .htw-topbar {
+        padding: 0.4rem 0.6rem;
+    }
 }
 
 .tag-header h4 {
