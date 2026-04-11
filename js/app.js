@@ -1188,23 +1188,30 @@ function loadSelectedLetters() {
     return {};
 }
 
-function loadPersonOverrides() {
-    var saved = localStorage.getItem('personOverrides');
-    if (!saved) return {};
-    var parsed;
-    try { parsed = JSON.parse(saved); } catch(e) { return {}; }
-    // One-time migration: strip the old buggy Hebrew death date so the
-    // corrected value from config.js can take effect.
+// Strip the old buggy Hebrew death date from a personOverrides blob so
+// the corrected value from config.js takes effect. Returns true if changed.
+function migratePersonOverrides(overrides) {
+    if (!overrides) return false;
     var dirty = false;
-    Object.keys(parsed).forEach(function(key) {
-        var o = parsed[key];
+    Object.keys(overrides).forEach(function(key) {
+        var o = overrides[key];
         if (!o) return;
         if (o.deathDateHebrew === 'ג\' אלול תשפ"ב') {
             delete o.deathDateHebrew;
             dirty = true;
         }
     });
-    if (dirty) localStorage.setItem('personOverrides', JSON.stringify(parsed));
+    return dirty;
+}
+
+function loadPersonOverrides() {
+    var saved = localStorage.getItem('personOverrides');
+    if (!saved) return {};
+    var parsed;
+    try { parsed = JSON.parse(saved); } catch(e) { return {}; }
+    if (migratePersonOverrides(parsed)) {
+        localStorage.setItem('personOverrides', JSON.stringify(parsed));
+    }
     return parsed;
 }
 
@@ -1236,7 +1243,12 @@ function collectSiteData() {
 function applySiteData(data) {
     if (!data || typeof data !== 'object') return;
 
+    // Track whether the cloud payload needed migration. If so, push the
+    // cleaned version back so every future load is already correct.
+    var migrated = false;
+
     if (data.personOverrides) {
+        if (migratePersonOverrides(data.personOverrides)) migrated = true;
         state.personOverrides = data.personOverrides;
         localStorage.setItem('personOverrides', JSON.stringify(data.personOverrides));
     }
@@ -1253,6 +1265,10 @@ function applySiteData(data) {
         localStorage.setItem('selectedLetters', JSON.stringify(data.selectedLetters));
     }
     if (data.familyTree) {
+        if (typeof migrateTreeMichalToMiki === 'function' &&
+            migrateTreeMichalToMiki(data.familyTree)) {
+            migrated = true;
+        }
         SITE_CONFIG.familyTree.children = data.familyTree;
         localStorage.setItem('familyTree', JSON.stringify(data.familyTree));
     }
@@ -1262,6 +1278,13 @@ function applySiteData(data) {
         SITE_CONFIG.familyTree.spouseBirthDate = data.familyTreeRoot.spouseBirthDate || '';
         SITE_CONFIG.familyTree.spouseAlive = data.familyTreeRoot.spouseAlive !== false;
         localStorage.setItem('familyTreeRoot', JSON.stringify(data.familyTreeRoot));
+    }
+
+    // If the cloud payload was stale, write the cleaned version back so
+    // the next load (for this or any other client) is already correct.
+    if (migrated) {
+        console.log('[Cloud] migrated stale payload — writing back');
+        try { saveToCloud(); } catch(e) { console.error('writeback:', e); }
     }
 }
 
