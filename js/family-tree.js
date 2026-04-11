@@ -2,12 +2,37 @@
 
 var FAMILY_DATA = SITE_CONFIG.familyTree;
 
+// Rename legacy "מיכל" to "מיקי" in a stored tree, so the fix applies
+// for users whose browsers still hold the old cached version.
+function migrateTreeMichalToMiki(nodes) {
+    if (!nodes || !nodes.length) return false;
+    var changed = false;
+    nodes.forEach(function(n) {
+        if (n && typeof n.name === 'string' && n.name.indexOf('מיכל') === 0) {
+            n.name = n.name.replace(/^מיכל/, 'מיקי');
+            changed = true;
+        }
+        if (n && n._ed && n._ed.firstName === 'מיכל') {
+            n._ed.firstName = 'מיקי';
+            changed = true;
+        }
+        if (n && n.children) {
+            if (migrateTreeMichalToMiki(n.children)) changed = true;
+        }
+    });
+    return changed;
+}
+
 // Load saved tree from localStorage
 (function() {
     var saved = localStorage.getItem('familyTree');
     if (saved) {
         try {
-            FAMILY_DATA.children = JSON.parse(saved);
+            var parsedChildren = JSON.parse(saved);
+            if (migrateTreeMichalToMiki(parsedChildren)) {
+                localStorage.setItem('familyTree', JSON.stringify(parsedChildren));
+            }
+            FAMILY_DATA.children = parsedChildren;
             SITE_CONFIG.familyTree.children = FAMILY_DATA.children;
         } catch(e) {}
     }

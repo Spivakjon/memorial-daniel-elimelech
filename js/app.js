@@ -1190,8 +1190,22 @@ function loadSelectedLetters() {
 
 function loadPersonOverrides() {
     var saved = localStorage.getItem('personOverrides');
-    if (saved) return JSON.parse(saved);
-    return {};
+    if (!saved) return {};
+    var parsed;
+    try { parsed = JSON.parse(saved); } catch(e) { return {}; }
+    // One-time migration: strip the old buggy Hebrew death date so the
+    // corrected value from config.js can take effect.
+    var dirty = false;
+    Object.keys(parsed).forEach(function(key) {
+        var o = parsed[key];
+        if (!o) return;
+        if (o.deathDateHebrew === 'ג\' אלול תשפ"ב') {
+            delete o.deathDateHebrew;
+            dirty = true;
+        }
+    });
+    if (dirty) localStorage.setItem('personOverrides', JSON.stringify(parsed));
+    return parsed;
 }
 
 function saveSelectedLetters() {

@@ -75,10 +75,10 @@ var SITE_CONFIG = {
                 ]
             },
             {
-                name: 'מיכל ואיציק',
+                name: 'מיקי ואיציק',
                 info: '',
                 level: 'child',
-                _ed: { firstName: 'מיכל', spouseName: 'איציק', lastName: '', birthDate: '', spouseBirthDate: '', weddingDate: '' },
+                _ed: { firstName: 'מיקי', spouseName: 'איציק', lastName: '', birthDate: '', spouseBirthDate: '', weddingDate: '' },
                 children: [
                     { name: 'קרולין ובר', info: '', level: 'gc',
                       _ed: { firstName: 'קרולין', spouseName: 'בר', lastName: '', birthDate: '', spouseBirthDate: '', weddingDate: '' }, children: [] },
