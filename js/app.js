@@ -1213,13 +1213,16 @@ function loadSelectedLetters() {
 
 // Strip the old buggy Hebrew death date from a personOverrides blob so
 // the corrected value from config.js takes effect. Returns true if changed.
+// Uses a tolerant match (any "ג" that references אלול) to survive small
+// character-level differences such as ASCII ' vs Hebrew ׳ or stray spaces.
 function migratePersonOverrides(overrides) {
     if (!overrides) return false;
     var dirty = false;
     Object.keys(overrides).forEach(function(key) {
         var o = overrides[key];
         if (!o) return;
-        if (o.deathDateHebrew === 'ג\' אלול תשפ"ב') {
+        var v = (o.deathDateHebrew || '').trim();
+        if (v && v.charAt(0) === 'ג' && v.indexOf('אלול') !== -1) {
             delete o.deathDateHebrew;
             dirty = true;
         }
