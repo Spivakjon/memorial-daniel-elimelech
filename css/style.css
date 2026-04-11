@@ -628,6 +628,13 @@ body {
     letter-spacing: 2px;
 }
 
+.age-at-death {
+    font-size: 0.95rem;
+    color: var(--accent-dark);
+    margin-top: 0.25rem;
+    font-weight: 500;
+}
+
 /* Action Buttons Row */
 .action-buttons-row {
     display: flex;

@@ -28,6 +28,7 @@ function applyPersonOverrides() {
         if (saved.name) p.name = saved.name;
         if (saved.fullNameHebrew) p.fullNameHebrew = saved.fullNameHebrew;
         if (saved.birthYear) p.birthYear = saved.birthYear;
+        if (saved.birthDateGregorian) p.birthDateGregorian = saved.birthDateGregorian;
         if (saved.deathYear) p.deathYear = saved.deathYear;
         if (saved.deathDateGregorian) p.deathDateGregorian = saved.deathDateGregorian;
         if (saved.deathDateHebrew) p.deathDateHebrew = saved.deathDateHebrew;
@@ -42,6 +43,23 @@ function applyPersonOverrides() {
 
 // ==================== DYNAMIC PAGE GENERATION ====================
 
+function computeAgeAtDeath(p) {
+    if (p.birthDateGregorian && p.deathDateGregorian) {
+        var b = new Date(p.birthDateGregorian + 'T00:00:00');
+        var d = new Date(p.deathDateGregorian + 'T00:00:00');
+        if (isNaN(b.getTime()) || isNaN(d.getTime())) return null;
+        var a = d.getFullYear() - b.getFullYear();
+        var mDiff = d.getMonth() - b.getMonth();
+        if (mDiff < 0 || (mDiff === 0 && d.getDate() < b.getDate())) a--;
+        return a >= 0 ? a : null;
+    }
+    if (p.birthYear && p.deathYear) {
+        var diff = parseInt(p.deathYear, 10) - parseInt(p.birthYear, 10);
+        return isNaN(diff) || diff < 0 ? null : diff;
+    }
+    return null;
+}
+
 function renderPersonCards() {
     var container = document.getElementById('person-cards');
     container.innerHTML = '';
@@ -51,12 +69,15 @@ function renderPersonCards() {
             lifeYears = (p.birthYear || '?') + ' - ' + (p.deathYear || '?');
         }
         var prefix = p.gender === 'male' ? 'נפטר' : 'נפטרה';
+        var age = computeAgeAtDeath(p);
+        var ageLabel = p.gender === 'male' ? 'בן' : 'בת';
         var card = document.createElement('div');
         card.className = 'person-card';
         card.innerHTML =
             '<h2>' + p.name + ' ז"ל</h2>' +
             (lifeYears ? '<p class="life-years">' + lifeYears + '</p>' : '') +
             '<p class="dates">' + prefix + ': ' + p.deathDateHebrew + ' | ' + formatDate(p.deathDateGregorian) + '</p>' +
+            (age !== null ? '<p class="age-at-death">' + prefix + ' ' + ageLabel + ' ' + age + '</p>' : '') +
             '<p class="time-elapsed" id="elapsed-' + p.key + '"></p>' +
             (p.cemetery ? '<p>' + p.cemetery + '</p>' : '');
         container.appendChild(card);
@@ -110,7 +131,8 @@ function renderPersonDetailsEditor() {
     SITE_CONFIG.people.forEach(function(p) {
         html += '<h4>' + p.name + '</h4>';
         html += '<div class="form-group"><label>שם מלא:</label><input type="text" id="edit-name-' + p.key + '" value="' + (p.name || '') + '"></div>';
-        html += '<div class="form-group"><label>שנת לידה:</label><input type="text" id="edit-birth-' + p.key + '" value="' + (p.birthYear || '') + '"></div>';
+        html += '<div class="form-group"><label>שנת לידה:</label><input type="text" id="edit-birth-' + p.key + '" value="' + (p.birthYear || '') + '" placeholder="למשל 1945"></div>';
+        html += '<div class="form-group"><label>תאריך לידה מלא (לא חובה):</label><input type="date" id="edit-birth-date-' + p.key + '" value="' + (p.birthDateGregorian || '') + '"></div>';
         html += '<div class="form-group"><label>תאריך פטירה לועזי (YYYY-MM-DD):</label><input type="date" id="edit-death-' + p.key + '" value="' + (p.deathDateGregorian || '') + '"></div>';
         html += '<div class="form-group"><label>תאריך פטירה עברי:</label><input type="text" id="edit-death-heb-' + p.key + '" value="' + (p.deathDateHebrew || '') + '"></div>';
         html += '<div class="form-group"><label>שם האב (להשכבה):</label><input type="text" id="edit-father-' + p.key + '" value="' + (p.fatherName || '') + '"></div>';
@@ -130,6 +152,7 @@ function savePersonDetails() {
             name: document.getElementById('edit-name-' + p.key).value.trim(),
             fullNameHebrew: document.getElementById('edit-name-' + p.key).value.trim(),
             birthYear: document.getElementById('edit-birth-' + p.key).value.trim(),
+            birthDateGregorian: document.getElementById('edit-birth-date-' + p.key).value.trim(),
             deathDateGregorian: document.getElementById('edit-death-' + p.key).value.trim(),
             deathDateHebrew: document.getElementById('edit-death-heb-' + p.key).value.trim(),
             fatherName: document.getElementById('edit-father-' + p.key).value.trim(),
@@ -137,6 +160,11 @@ function savePersonDetails() {
             cemeteryWazeUrl: document.getElementById('edit-waze-' + p.key).value.trim(),
             descriptor: document.getElementById('edit-desc-' + p.key).value.trim()
         };
+        // If a full birth date is given, derive birthYear from it when missing
+        var bd = overrides[p.key].birthDateGregorian;
+        if (bd && !overrides[p.key].birthYear) {
+            overrides[p.key].birthYear = bd.split('-')[0];
+        }
         // Derive deathYear
         var dg = overrides[p.key].deathDateGregorian;
         if (dg) overrides[p.key].deathYear = dg.split('-')[0];
@@ -205,6 +233,30 @@ function getPersonTitle(forPerson) {
     return SITE_CONFIG.people[0].name + ' ז"ל';
 }
 
+var HEBREW_ORDINALS_F = ['', 'ראשונה', 'שנייה', 'שלישית', 'רביעית', 'חמישית',
+    'שישית', 'שביעית', 'שמינית', 'תשיעית', 'עשירית'];
+
+function computeAzkaraYearLabel(azkara) {
+    if (!azkara || !azkara.date) return '';
+    var personKey = azkara.forPerson;
+    var person = null;
+    SITE_CONFIG.people.forEach(function(p) { if (p.key === personKey) person = p; });
+    if (!person) person = SITE_CONFIG.people[0];
+    if (!person || !person.deathYear) return '';
+    var azkaraYear = parseInt(azkara.date.split('-')[0], 10);
+    var deathYear = parseInt(person.deathYear, 10);
+    if (isNaN(azkaraYear) || isNaN(deathYear)) return '';
+    var n = azkaraYear - deathYear;
+    if (n <= 0) return '';
+    if (n < HEBREW_ORDINALS_F.length) return HEBREW_ORDINALS_F[n];
+    return 'ה-' + n;
+}
+
+function getAzkaraYearLabel(azkara) {
+    if (azkara && azkara.yearLabel) return azkara.yearLabel;
+    return computeAzkaraYearLabel(azkara);
+}
+
 function formatAzkaraDate(azkara) {
     var dateObj = new Date(azkara.date + 'T00:00:00');
     var days = ['ראשון', 'שני', 'שלישי', 'רביעי', 'חמישי', 'שישי', 'שבת'];
@@ -230,11 +282,11 @@ function updateMemorialAzkara() {
     else if (diffDays === 1) countdownText = 'מחר!';
     else countdownText = 'בעוד ' + diffDays + ' ימים';
 
-    var yearsText = azkara.yearLabel;
+    var yearsText = getAzkaraYearLabel(azkara);
 
     container.innerHTML =
         '<div class="azkara-banner">' +
-            '<h3>אזכרה - ' + yearsText + '</h3>' +
+            '<h3>אזכרה' + (yearsText ? ' - ' + yearsText : '') + '</h3>' +
             '<p><strong>' + getPersonTitle(azkara.forPerson) + '</strong></p>' +
             '<p>' + formatAzkaraDate(azkara) + ' בשעה ' + azkara.time + '</p>' +
             (azkara.location ? '<p>' + azkara.location + '</p>' : '') +
@@ -263,11 +315,15 @@ function initDarkMode() {
 
 function shareWhatsApp() {
     var azkara = state.azkara;
+    if (!azkara.date) {
+        alert('עדיין לא נקבעה אזכרה. יש להגדיר תאריך במסך הניהול לפני שיתוף.');
+        return;
+    }
     var title = getPersonTitle(azkara.forPerson);
     var dateParts = azkara.date.split('-');
     var formattedDate = dateParts[2] + '/' + dateParts[1] + '/' + dateParts[0];
 
-    var text = 'אזכרה ' + azkara.yearLabel + '\n' +
+    var text = 'אזכרה ' + getAzkaraYearLabel(azkara) + '\n' +
         title + '\n' +
         formattedDate + ' בשעה ' + azkara.time + '\n' +
         (azkara.location ? azkara.location + '\n' : '') + '\n' +
@@ -998,7 +1054,7 @@ function generateQuickPdf() {
         var checkedItems = [];
         document.querySelectorAll('#main-seder-checklist input:checked').forEach(function(cb) { checkedItems.push(cb.value); });
 
-        var html = '<h1 class="pdf-main-title">סדר אזכרה ' + azkara.yearLabel + '</h1>';
+        var html = '<h1 class="pdf-main-title">סדר אזכרה ' + getAzkaraYearLabel(azkara) + '</h1>';
         html += '<h1 class="pdf-sub-title">' + getPersonTitle(azkara.forPerson) + '</h1>';
 
         SITE_CONFIG.people.forEach(function(p) {
@@ -1058,7 +1114,7 @@ function generateAdvancedPdf() {
         var checkedItems = [];
         document.querySelectorAll('#adv-seder-checklist input:checked').forEach(function(cb) { checkedItems.push(cb.value); });
 
-        var html = '<h1 class="pdf-main-title">סדר אזכרה ' + azkara.yearLabel + '</h1>';
+        var html = '<h1 class="pdf-main-title">סדר אזכרה ' + getAzkaraYearLabel(azkara) + '</h1>';
         html += '<h1 class="pdf-sub-title">' + getPersonTitle(azkara.forPerson) + '</h1>';
 
         if (azkara.date) {

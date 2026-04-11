@@ -8,7 +8,7 @@ var SITE_CONFIG = {
     // ===== פרטי האתר =====
     siteTitle: 'לזכר דניאל אלימלך ז"ל',
     builtBy: 'יהונתן ספיבק',
-    password: '3008',  // סיסמת ניהול
+    password: '2708',  // סיסמת ניהול
 
     // ===== נפטרים (מערך - תומך ב-1 או 2 אנשים) =====
     people: [
@@ -18,6 +18,7 @@ var SITE_CONFIG = {
             fullNameHebrew: 'דניאל אלימלך',
             gender: 'male',
             birthYear: '',           // TODO: שנת לידה
+            birthDateGregorian: '', // TODO: תאריך לידה מלא (לא חובה) - YYYY-MM-DD
             deathYear: '2022',
             deathDateGregorian: '2022-08-30',
             deathDateHebrew: 'ג\' אלול תשפ"ב',
@@ -39,12 +40,13 @@ var SITE_CONFIG = {
     neshamaLetters: ['נ', 'ש', 'מ', 'ה'],
 
     // ===== הגדרות אזכרה - ברירת מחדל =====
+    // השאירו date ריק כדי שלא תוצג תזכורת עד שתקבע אזכרה דרך מסך הניהול
     azkaraDefaults: {
         forPerson: 'daniel',
-        date: '2026-08-20',        // TODO: תאריך לועזי של האזכרה הקרובה
-        time: '09:30',
-        location: '',              // TODO: מיקום האזכרה
-        yearLabel: 'רביעית'        // שנה רביעית
+        date: '',                  // ריק = לא מוצגת תזכורת בדף הבית
+        time: '',
+        location: '',
+        yearLabel: ''              // ריק = יחושב אוטומטית משנת הפטירה
     },
 
     // ===== עץ משפחה =====
