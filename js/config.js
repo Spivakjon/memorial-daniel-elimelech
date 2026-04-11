@@ -17,11 +17,12 @@ var SITE_CONFIG = {
             name: 'דניאל אלימלך',
             fullNameHebrew: 'דניאל אלימלך',
             gender: 'male',
-            birthYear: '',           // TODO: שנת לידה
-            birthDateGregorian: '', // TODO: תאריך לידה מלא (לא חובה) - YYYY-MM-DD
+            birthYear: '1939',
+            birthDateGregorian: '1939-08-23',
+            birthDateHebrew: 'ה\' אלול תרצ"ט',
             deathYear: '2022',
             deathDateGregorian: '2022-08-30',
-            deathDateHebrew: 'ג\' אלול תשפ"ב',
+            deathDateHebrew: 'ח\' אלול תשפ"ב',
             fatherName: '',          // TODO: שם האב - להשכבה
             motherName: '',          // TODO: שם האם
             cemetery: '',            // TODO: בית עלמין

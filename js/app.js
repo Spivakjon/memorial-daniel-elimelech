@@ -29,6 +29,7 @@ function applyPersonOverrides() {
         if (saved.fullNameHebrew) p.fullNameHebrew = saved.fullNameHebrew;
         if (saved.birthYear) p.birthYear = saved.birthYear;
         if (saved.birthDateGregorian) p.birthDateGregorian = saved.birthDateGregorian;
+        if (saved.birthDateHebrew) p.birthDateHebrew = saved.birthDateHebrew;
         if (saved.deathYear) p.deathYear = saved.deathYear;
         if (saved.deathDateGregorian) p.deathDateGregorian = saved.deathDateGregorian;
         if (saved.deathDateHebrew) p.deathDateHebrew = saved.deathDateHebrew;
@@ -69,13 +70,22 @@ function renderPersonCards() {
             lifeYears = (p.birthYear || '?') + ' - ' + (p.deathYear || '?');
         }
         var prefix = p.gender === 'male' ? 'נפטר' : 'נפטרה';
+        var bornPrefix = p.gender === 'male' ? 'נולד' : 'נולדה';
         var age = computeAgeAtDeath(p);
         var ageLabel = p.gender === 'male' ? 'בן' : 'בת';
+        var birthLine = '';
+        if (p.birthDateHebrew || p.birthDateGregorian) {
+            var parts = [];
+            if (p.birthDateHebrew) parts.push(p.birthDateHebrew);
+            if (p.birthDateGregorian) parts.push(formatDate(p.birthDateGregorian));
+            birthLine = '<p class="dates">' + bornPrefix + ': ' + parts.join(' | ') + '</p>';
+        }
         var card = document.createElement('div');
         card.className = 'person-card';
         card.innerHTML =
             '<h2>' + p.name + ' ז"ל</h2>' +
             (lifeYears ? '<p class="life-years">' + lifeYears + '</p>' : '') +
+            birthLine +
             '<p class="dates">' + prefix + ': ' + p.deathDateHebrew + ' | ' + formatDate(p.deathDateGregorian) + '</p>' +
             (age !== null ? '<p class="age-at-death">' + prefix + ' ' + ageLabel + ' ' + age + '</p>' : '') +
             '<p class="time-elapsed" id="elapsed-' + p.key + '"></p>' +
@@ -133,6 +143,7 @@ function renderPersonDetailsEditor() {
         html += '<div class="form-group"><label>שם מלא:</label><input type="text" id="edit-name-' + p.key + '" value="' + (p.name || '') + '"></div>';
         html += '<div class="form-group"><label>שנת לידה:</label><input type="text" id="edit-birth-' + p.key + '" value="' + (p.birthYear || '') + '" placeholder="למשל 1945"></div>';
         html += '<div class="form-group"><label>תאריך לידה מלא (לא חובה):</label><input type="date" id="edit-birth-date-' + p.key + '" value="' + (p.birthDateGregorian || '') + '"></div>';
+        html += '<div class="form-group"><label>תאריך לידה עברי (לא חובה):</label><input type="text" id="edit-birth-heb-' + p.key + '" value="' + (p.birthDateHebrew || '') + '" placeholder="למשל: ה\' אלול תרצ&quot;ט"></div>';
         html += '<div class="form-group"><label>תאריך פטירה לועזי (YYYY-MM-DD):</label><input type="date" id="edit-death-' + p.key + '" value="' + (p.deathDateGregorian || '') + '"></div>';
         html += '<div class="form-group"><label>תאריך פטירה עברי:</label><input type="text" id="edit-death-heb-' + p.key + '" value="' + (p.deathDateHebrew || '') + '"></div>';
         html += '<div class="form-group"><label>שם האב (להשכבה):</label><input type="text" id="edit-father-' + p.key + '" value="' + (p.fatherName || '') + '"></div>';
@@ -153,6 +164,7 @@ function savePersonDetails() {
             fullNameHebrew: document.getElementById('edit-name-' + p.key).value.trim(),
             birthYear: document.getElementById('edit-birth-' + p.key).value.trim(),
             birthDateGregorian: document.getElementById('edit-birth-date-' + p.key).value.trim(),
+            birthDateHebrew: document.getElementById('edit-birth-heb-' + p.key).value.trim(),
             deathDateGregorian: document.getElementById('edit-death-' + p.key).value.trim(),
             deathDateHebrew: document.getElementById('edit-death-heb-' + p.key).value.trim(),
             fatherName: document.getElementById('edit-father-' + p.key).value.trim(),
