@@ -9,7 +9,7 @@
 
 var FOLDER_NAME = 'הנצחה דניאל אלימלך - תמונות';
 var CONFIG_FILE_NAME = '_site_config.json';
-var PASSWORD = '3008';
+var PASSWORD = '2708';
 
 function getOrCreateFolder() {
   var folders = DriveApp.getFoldersByName(FOLDER_NAME);
