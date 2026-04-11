@@ -265,8 +265,12 @@ function computeAzkaraYearLabel(azkara) {
 }
 
 function getAzkaraYearLabel(azkara) {
-    if (azkara && azkara.yearLabel) return azkara.yearLabel;
-    return computeAzkaraYearLabel(azkara);
+    // Prefer the computed value — the stored yearLabel is often a stale
+    // default from an older config version. Only fall back to the stored
+    // value when we cannot compute (e.g. no death year or no azkara date).
+    var computed = computeAzkaraYearLabel(azkara);
+    if (computed) return computed;
+    return (azkara && azkara.yearLabel) || '';
 }
 
 function formatAzkaraDate(azkara) {
@@ -1164,9 +1168,28 @@ function generateAdvancedPdf() {
 
 // ==================== LOCAL STORAGE ====================
 
+// Strip a stale hardcoded yearLabel so the auto-computed value takes over.
+// Returns true if the object was modified.
+function migrateAzkara(azkara) {
+    if (!azkara) return false;
+    if (azkara.yearLabel === 'רביעית') {
+        delete azkara.yearLabel;
+        return true;
+    }
+    return false;
+}
+
 function loadAzkara() {
     var saved = localStorage.getItem('azkara');
-    if (saved) return JSON.parse(saved);
+    if (saved) {
+        try {
+            var parsed = JSON.parse(saved);
+            if (migrateAzkara(parsed)) {
+                localStorage.setItem('azkara', JSON.stringify(parsed));
+            }
+            return parsed;
+        } catch(e) {}
+    }
     return {
         forPerson: SITE_CONFIG.azkaraDefaults.forPerson,
         date: SITE_CONFIG.azkaraDefaults.date,
@@ -1253,6 +1276,7 @@ function applySiteData(data) {
         localStorage.setItem('personOverrides', JSON.stringify(data.personOverrides));
     }
     if (data.azkara) {
+        if (migrateAzkara(data.azkara)) migrated = true;
         state.azkara = data.azkara;
         localStorage.setItem('azkara', JSON.stringify(data.azkara));
     }
